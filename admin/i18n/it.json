@@ -46,6 +46,8 @@
     "No added devices": "Non è stata aggiunta alcuna TV.",
     "No discovered devices": "Non sono stati scoperti televisori aggiuntivi.",
     "Not paired": "Non accoppiato",
+    "Off": "Spento",
+    "On": "Acceso",
     "One TV found": "%s TV rilevata.",
     "Pair": "Paio",
     "Pair again": "Associa di nuovo",
@@ -74,6 +76,7 @@
     "Scenes help": "Una scena invia più tasti, app e ingressi uno dopo l'altro, ad es. HOME, YOUTUBE, WAIT 3000, OK. Passi: tasti (HOME, UP, SELECT o OK, BACK, 1, VOLUP, KEY_...), app (YOUTUBE, NETFLIX, DISNEY_PLUS...), ingressi (TV, HDMI1, HDMI2...) e pause (WAIT 2000). Ogni scena riceve un pulsante <TV>.scenes.<nome>.",
     "Seconds": "secondi",
     "Send a test key?": "Inviare un tasto di prova? Il televisore mostrerà il banner informativo.",
+    "Set the volume": "Imposta il volume",
     "Set token": "Imposta token",
     "Set token failed": "Impostazione del token non riuscita",
     "Set up the inputs now?": "Configurare ora gli ingressi (HDMI, TV...)? I televisori più recenti cambiano ingresso solo tramite il menu delle sorgenti, il cui ordine va inserito una volta.",
@@ -84,6 +87,8 @@
     "Stable ID": "ID stabile",
     "Stable identity note": "L'indirizzo MAC viene utilizzato per seguire le modifiche dell'indirizzo DHCP. Il nome descrittivo definisce il percorso dell'oggetto.",
     "Steps": "Passi",
+    "Switch on or off": "Accendi o spegni",
+    "Switch the sound on": "Riattiva l'audio",
     "TV": "TV",
     "TVs found": "%s TV rilevate.",
     "Test connection": "Invia tasto di prova",
@@ -98,6 +103,7 @@
     "Unknown": "Sconosciuto",
     "Unknown device": "Dispositivo sconosciuto",
     "Volume": "Volume",
+    "Volume failed": "Impossibile impostare il volume",
     "mDNS services": "Servizi mDNS",
     "ms": "ms"
 }

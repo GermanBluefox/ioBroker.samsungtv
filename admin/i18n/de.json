@@ -46,6 +46,8 @@
     "No added devices": "Es wurden noch keine TVs hinzugefügt.",
     "No discovered devices": "Keine weiteren TVs gefunden.",
     "Not paired": "Nicht gepairt",
+    "Off": "Aus",
+    "On": "An",
     "One TV found": "%s TV gefunden.",
     "Pair": "Pairing",
     "Pair again": "Erneut pairen",
@@ -74,6 +76,7 @@
     "Scenes help": "Eine Szene sendet mehrere Tasten, Apps und Eingänge nacheinander, z. B. HOME, YOUTUBE, WAIT 3000, OK. Schritte: Tasten (HOME, UP, SELECT oder OK, BACK, 1, VOLUP, KEY_...), Apps (YOUTUBE, NETFLIX, DISNEY_PLUS ...), Eingänge (TV, HDMI1, HDMI2 ...) und Pausen (WAIT 2000). Jede Szene bekommt einen Knopf <TV>.scenes.<Name>.",
     "Seconds": "Sekunden",
     "Send a test key?": "Testtaste senden? Der TV zeigt dann seine Info-Einblendung.",
+    "Set the volume": "Lautstärke einstellen",
     "Set token": "Token setzen",
     "Set token failed": "Token konnte nicht gesetzt werden",
     "Set up the inputs now?": "Jetzt die Eingänge (HDMI, TV …) einrichten? Neuere TVs wechseln den Eingang nur über das Quellenmenü, dessen Reihenfolge einmal eingetragen werden muss.",
@@ -84,6 +87,8 @@
     "Stable ID": "Stabile ID",
     "Stable identity note": "Die MAC-Adresse verfolgt DHCP-Adressänderungen. Der Anzeigename bestimmt den Objektpfad.",
     "Steps": "Schritte",
+    "Switch on or off": "Ein- oder ausschalten",
+    "Switch the sound on": "Ton wieder einschalten",
     "TV": "TV",
     "TVs found": "%s TVs gefunden.",
     "Test connection": "Testtaste senden",
@@ -98,6 +103,7 @@
     "Unknown": "Unbekannt",
     "Unknown device": "Unbekanntes Gerät",
     "Volume": "Lautstärke",
+    "Volume failed": "Lautstärke konnte nicht gesetzt werden",
     "mDNS services": "mDNS-Dienste",
     "ms": "ms"
 }

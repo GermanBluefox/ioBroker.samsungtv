@@ -46,6 +46,8 @@
     "No added devices": "Aucun téléviseur n'a été ajouté.",
     "No discovered devices": "Aucun téléviseur supplémentaire n'a été découvert.",
     "Not paired": "Non jumelé",
+    "Off": "Éteint",
+    "On": "Allumé",
     "One TV found": "%s téléviseur détecté.",
     "Pair": "Paire",
     "Pair again": "Réappairer",
@@ -74,6 +76,7 @@
     "Scenes help": "Une scène envoie plusieurs touches, applications et entrées l'une après l'autre, par ex. HOME, YOUTUBE, WAIT 3000, OK. Étapes : touches (HOME, UP, SELECT ou OK, BACK, 1, VOLUP, KEY_...), applications (YOUTUBE, NETFLIX, DISNEY_PLUS...), entrées (TV, HDMI1, HDMI2...) et pauses (WAIT 2000). Chaque scène reçoit un bouton <TV>.scenes.<nom>.",
     "Seconds": "secondes",
     "Send a test key?": "Envoyer une touche de test ? Le téléviseur affiche alors son bandeau d'informations.",
+    "Set the volume": "Régler le volume",
     "Set token": "Définir le jeton",
     "Set token failed": "Échec de la définition du jeton",
     "Set up the inputs now?": "Configurer les entrées (HDMI, TV...) maintenant ? Les téléviseurs récents ne changent d'entrée que par le menu des sources, dont l'ordre doit être saisi une fois.",
@@ -84,6 +87,8 @@
     "Stable ID": "ID stable",
     "Stable identity note": "L'adresse MAC est utilisée pour suivre les changements d'adresse DHCP. Le nom convivial définit le chemin de l'objet.",
     "Steps": "Étapes",
+    "Switch on or off": "Allumer ou éteindre",
+    "Switch the sound on": "Réactiver le son",
     "TV": "Téléviseur",
     "TVs found": "%s téléviseurs détectés.",
     "Test connection": "Envoyer une touche de test",
@@ -98,6 +103,7 @@
     "Unknown": "Inconnu",
     "Unknown device": "Appareil inconnu",
     "Volume": "Volume",
+    "Volume failed": "Impossible de régler le volume",
     "mDNS services": "Services mDNS",
     "ms": "ms"
 }

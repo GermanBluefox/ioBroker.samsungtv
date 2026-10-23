@@ -46,6 +46,8 @@
     "No added devices": "No TVs have been added.",
     "No discovered devices": "No additional TVs were discovered.",
     "Not paired": "Not paired",
+    "Off": "Off",
+    "On": "On",
     "One TV found": "%s TV found.",
     "Pair": "Pair",
     "Pair again": "Pair again",
@@ -74,6 +76,7 @@
     "Scenes help": "A scene sends several keys, apps and inputs one after the other, e.g. HOME, YOUTUBE, WAIT 3000, OK. Steps: keys (HOME, UP, SELECT or OK, BACK, 1, VOLUP, KEY_...), apps (YOUTUBE, NETFLIX, DISNEY_PLUS...), inputs (TV, HDMI1, HDMI2...) and pauses (WAIT 2000). Every scene gets a button <TV>.scenes.<name>.",
     "Seconds": "seconds",
     "Send a test key?": "Send a test key? The TV then shows its info banner.",
+    "Set the volume": "Set the volume",
     "Set token": "Set token",
     "Set token failed": "Setting the token failed",
     "Set up the inputs now?": "Set up the inputs (HDMI, TV...) now? Newer TVs switch the input only over the source menu, whose order has to be entered once.",
@@ -84,6 +87,8 @@
     "Stable ID": "Stable ID",
     "Stable identity note": "The MAC address is used to follow DHCP address changes. The friendly name defines the object path.",
     "Steps": "Steps",
+    "Switch on or off": "Switch on or off",
+    "Switch the sound on": "Switch the sound on",
     "TV": "TV",
     "TVs found": "%s TVs found.",
     "Test connection": "Send a test key",
@@ -98,6 +103,7 @@
     "Unknown": "Unknown",
     "Unknown device": "Unknown device",
     "Volume": "Volume",
+    "Volume failed": "Setting the volume failed",
     "mDNS services": "mDNS services",
     "ms": "ms"
 }

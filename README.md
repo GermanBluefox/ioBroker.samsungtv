@@ -88,6 +88,10 @@ their fixed values in `common.states`, so visualizations and the devices adapter
   again.
 - `control.source`: an input (`TV`, `HDMI1`, `HDMI2`, ...) or a key code (`KEY_SOURCE`, `KEY_HDMI`). See
   [Inputs](#inputs).
+- `control.power`: `true` switches on, `false` off. Tizen TVs are woken with Wake-on-LAN first (if enabled and
+  the MAC address is known), also while they still answer in standby; `KEY_POWER` follows only if the TV is not on
+  after 10 s. On The Frame, switching on in Art Mode leaves Art Mode, and switching off holds `KEY_POWER` for 3 s,
+  because a short press only switches to Art Mode.
 - `control.volume`: absolute volume from 0 to 100
 - `control.muted`: mute on or off, as opposed to `control.mute`, which toggles
 - `control.artMode`: Art Mode of The Frame on or off. It is read on every poll and switched over the art channel
@@ -165,6 +169,8 @@ Note: not every TV supports every key. Some keys only work when a menu/focus is 
 - (@GermanBluefox) Add Art Mode for The Frame (`control.artMode`).
 - (@GermanBluefox) Add scenes: sequences of keys, apps, inputs and pauses with a button per scene.
 - (@GermanBluefox) Add a setup assistant after adding a TV and a remote control tab in the settings.
+- (@GermanBluefox) Control power, volume, mute, input, app and Art Mode from the Device Manager card; large cards.
+- (@GermanBluefox) Switch Tizen TVs on with Wake-on-LAN first; switch The Frame off instead of to Art Mode.
 
 ### 0.0.28
 

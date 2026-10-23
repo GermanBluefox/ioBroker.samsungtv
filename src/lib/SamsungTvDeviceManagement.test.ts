@@ -232,7 +232,17 @@ describe('Samsung TV device management', () => {
         assert.deepEqual(result, { refresh: 'devices' });
         assert.equal(JSON.stringify(context.messages).includes('12345678'), false);
         const actions = manager.configuredDeviceInfo(device).actions?.map(action => action.id);
-        assert.deepEqual(actions, ['pair', 'set-token', 'test', 'inputs', 'rename', 'delete']);
+        assert.deepEqual(actions, [
+            'pair',
+            'set-token',
+            'test',
+            'inputs',
+            'rename',
+            'delete',
+            'power',
+            'volume',
+            'unmute',
+        ]);
         const hjActions = manager.configuredDeviceInfo({ ...device, api: 'hj' }).actions?.map(action => action.id);
         assert.equal(hjActions?.includes('set-token'), false);
     });
@@ -291,6 +301,35 @@ describe('Samsung TV device management', () => {
         const result = (await volume.handler!(device.id, 'volume', 25, undefined as never)) as ioBroker.State;
         assert.equal(result.val, 25);
         assert.deepEqual(calls, [['frame', 'volume', 25]]);
+    });
+
+    it('switches the TV on and off with a click on the power indicator', async () => {
+        const calls: unknown[][] = [];
+        const device = { id: 'frame', name: 'living-room', api: 'tizen' };
+        let power: boolean | null = false;
+        const manager = createManager({
+            findDevice: () => device,
+            control: async (value: ManagedDevice, control: string, state: unknown) =>
+                calls.push([value.id, control, state]),
+        });
+        Object.assign(manager, {
+            adapter: {
+                namespace: 'samsungtv.0',
+                getForeignStateAsync: async (id: string) =>
+                    id === 'samsungtv.0.living-room.state.power' ? { val: power } : null,
+            },
+        });
+        const info = manager.configuredDeviceInfo(device);
+        assert.equal(info.indicators?.find(indicator => indicator.id === 'power')?.actionId, 'power');
+
+        await manager.togglePower(device.id);
+        power = true;
+        await manager.togglePower(device.id);
+
+        assert.deepEqual(calls, [
+            ['frame', 'power', true],
+            ['frame', 'power', false],
+        ]);
     });
 
     it('reports a failed control as an error of the device card', async () => {

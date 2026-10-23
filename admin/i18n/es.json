@@ -46,6 +46,8 @@
     "No added devices": "No se han agregado televisores.",
     "No discovered devices": "No se descubrieron televisores adicionales.",
     "Not paired": "No emparejado",
+    "Off": "Apagado",
+    "On": "Encendido",
     "One TV found": "%s televisor detectado.",
     "Pair": "Par",
     "Pair again": "Emparejar de nuevo",
@@ -74,6 +76,7 @@
     "Scenes help": "Una escena envía varias teclas, apps y entradas una tras otra, p. ej. HOME, YOUTUBE, WAIT 3000, OK. Pasos: teclas (HOME, UP, SELECT u OK, BACK, 1, VOLUP, KEY_...), apps (YOUTUBE, NETFLIX, DISNEY_PLUS...), entradas (TV, HDMI1, HDMI2...) y pausas (WAIT 2000). Cada escena recibe un botón <TV>.scenes.<nombre>.",
     "Seconds": "segundos",
     "Send a test key?": "¿Enviar una tecla de prueba? El televisor mostrará su banner de información.",
+    "Set the volume": "Ajustar el volumen",
     "Set token": "Establecer token",
     "Set token failed": "No se pudo establecer el token",
     "Set up the inputs now?": "¿Configurar ahora las entradas (HDMI, TV...)? Los televisores más nuevos cambian de entrada solo mediante el menú de fuentes, cuyo orden debe introducirse una vez.",
@@ -84,6 +87,8 @@
     "Stable ID": "ID estable",
     "Stable identity note": "La dirección MAC se utiliza para seguir los cambios de dirección DHCP. El nombre descriptivo define la ruta del objeto.",
     "Steps": "Pasos",
+    "Switch on or off": "Encender o apagar",
+    "Switch the sound on": "Activar el sonido",
     "TV": "Televisor",
     "TVs found": "%s televisores detectados.",
     "Test connection": "Enviar tecla de prueba",
@@ -98,6 +103,7 @@
     "Unknown": "Desconocido",
     "Unknown device": "Dispositivo desconocido",
     "Volume": "Volumen",
+    "Volume failed": "No se pudo ajustar el volumen",
     "mDNS services": "Servicios mDNS",
     "ms": "ms"
 }

@@ -46,6 +46,8 @@
     "No added devices": "Nie dodano żadnych telewizorów.",
     "No discovered devices": "Nie wykryto żadnych dodatkowych telewizorów.",
     "Not paired": "Nie sparowane",
+    "Off": "Wył.",
+    "On": "Wł.",
     "One TV found": "Znaleziono telewizorów: %s.",
     "Pair": "Para",
     "Pair again": "Sparuj ponownie",
@@ -74,6 +76,7 @@
     "Scenes help": "Scena wysyła kilka klawiszy, aplikacji i wejść po kolei, np. HOME, YOUTUBE, WAIT 3000, OK. Kroki: klawisze (HOME, UP, SELECT lub OK, BACK, 1, VOLUP, KEY_...), aplikacje (YOUTUBE, NETFLIX, DISNEY_PLUS...), wejścia (TV, HDMI1, HDMI2...) i pauzy (WAIT 2000). Każda scena otrzymuje przycisk <TV>.scenes.<nazwa>.",
     "Seconds": "sekundy",
     "Send a test key?": "Wysłać klawisz testowy? Telewizor wyświetli wtedy pasek informacyjny.",
+    "Set the volume": "Ustaw głośność",
     "Set token": "Ustaw token",
     "Set token failed": "Nie udało się ustawić tokenu",
     "Set up the inputs now?": "Skonfigurować teraz wejścia (HDMI, TV...)? Nowsze telewizory przełączają wejście tylko przez menu źródeł, którego kolejność trzeba wpisać raz.",
@@ -84,6 +87,8 @@
     "Stable ID": "Stały identyfikator",
     "Stable identity note": "Adres MAC jest używany do śledzenia zmian adresu DHCP. Przyjazna nazwa definiuje ścieżkę obiektu.",
     "Steps": "Kroki",
+    "Switch on or off": "Włącz lub wyłącz",
+    "Switch the sound on": "Włącz dźwięk",
     "TV": "Telewizor",
     "TVs found": "Znaleziono telewizorów: %s.",
     "Test connection": "Wyślij klawisz testowy",
@@ -98,6 +103,7 @@
     "Unknown": "Nieznany",
     "Unknown device": "Nieznane urządzenie",
     "Volume": "Głośność",
+    "Volume failed": "Nie udało się ustawić głośności",
     "mDNS services": "Usługi mDNS",
     "ms": "ms"
 }

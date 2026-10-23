@@ -82,6 +82,19 @@ const TV_ICON = `data:image/svg+xml;base64,${Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="#1689c9" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><rect x="2.5" y="4" width="19" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></g></svg>',
 ).toString('base64')}`;
 // Mid grey so the key reads on both light and dark admin themes; an <img> cannot inherit the theme colour.
+/** An icon as data URL; an <img> cannot follow the theme or the indicator color, so each state has its own */
+function svgIcon(paths: string, color: string): string {
+    return `data:image/svg+xml;base64,${Buffer.from(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="${color}" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">${paths}</g></svg>`,
+    ).toString('base64')}`;
+}
+const POWER_PATHS = '<path d="M12 3v9"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/>';
+const VOLUME_PATHS = '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/>';
+const MUTED_PATHS = '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m17 9 5 6M22 9l-5 6"/>';
+const POWER_OFF_ICON = svgIcon(POWER_PATHS, '#808080');
+const POWER_ON_ICON = svgIcon(POWER_PATHS, '#2e7d32');
+const VOLUME_ICON = svgIcon(VOLUME_PATHS, '#808080');
+const MUTED_ICON = svgIcon(MUTED_PATHS, '#d32f2f');
 const KEY_ICON = `data:image/svg+xml;base64,${Buffer.from(
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="#808080" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 20 3M16 7l3 3M18 5l2 2"/></g></svg>',
 ).toString('base64')}`;
@@ -232,7 +245,7 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
             apiVersion: 'v3',
             communicationStateId: 'info.deviceManager',
             identifierLabel: 'ID',
-            smallCards: true,
+            smallCards: false,
             actions: [
                 {
                     id: 'discover',
@@ -306,15 +319,37 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
                 handler: (id, context) => this.setToken(id, context),
             });
         }
+        // triggered by the indicators of the status line, not shown as buttons
+        actions.push(
+            {
+                id: 'power',
+                icon: POWER_ON_ICON,
+                description: t('Switch on or off'),
+                timeout: 60000,
+                handler: id => this.togglePower(id),
+            },
+            {
+                id: 'volume',
+                icon: VOLUME_ICON,
+                description: t('Set the volume'),
+                handler: (id, context) => this.setVolume(id, context),
+            },
+            {
+                id: 'unmute',
+                icon: MUTED_ICON,
+                description: t('Switch the sound on'),
+                handler: id => this.unmute(id),
+            },
+        );
         // before rename and delete
-        actions.splice(actions.length - 2, 0, {
+        actions.splice(actions.length - 5, 0, {
             id: 'test',
             icon: 'play',
             description: t('Test connection'),
             handler: (id, context) => this.test(id, context),
         });
         if (device.api === 'tizen' || device.api === 'unknown') {
-            actions.splice(actions.length - 2, 0, {
+            actions.splice(actions.length - 5, 0, {
                 id: 'inputs',
                 icon: 'settings',
                 description: t('Inputs'),
@@ -337,6 +372,46 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
             },
             controls: this.controlsOf(device),
             indicators: [
+                // power, volume and mute right on the card: one click switches, the volume opens a slider
+                {
+                    id: 'power',
+                    value: { stateId: `${namespace}.${device.name}.state.power` },
+                    icon: POWER_OFF_ICON,
+                    iconOn: POWER_ON_ICON,
+                    color: 'inactive',
+                    colorOn: 'ok',
+                    levels: [
+                        { value: true, text: t('On') },
+                        { value: false, text: t('Off') },
+                    ],
+                    tooltip: t('Switch on or off'),
+                    actionId: 'power',
+                    hideIfEmpty: false,
+                    order: 1,
+                },
+                {
+                    id: 'volume',
+                    value: { stateId: `${namespace}.${device.name}.state.volume` },
+                    icon: VOLUME_ICON,
+                    showValue: true,
+                    unit: '%',
+                    tooltip: t('Set the volume'),
+                    actionId: 'volume',
+                    hideIfEmpty: false,
+                    order: 2,
+                },
+                {
+                    id: 'muted',
+                    value: { stateId: `${namespace}.${device.name}.state.muted` },
+                    icon: MUTED_ICON,
+                    color: 'error',
+                    text: t('Muted'),
+                    tooltip: t('Switch the sound on'),
+                    actionId: 'unmute',
+                    // only visible while muted
+                    hideIfEmpty: true,
+                    order: 3,
+                },
                 {
                     id: 'paired',
                     value: { stateId: `${namespace}.${device.name}.info.paired` },
@@ -425,6 +500,63 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
             controls.push({ id: 'artMode', type: 'switch', label: t('Art Mode'), stateId: `${base}.artMode`, handler });
         }
         return controls;
+    }
+
+    /** The current value of a state of the TV, `null` if it has none */
+    private async stateOf(device: TDevice, state: string): Promise<ioBroker.StateValue> {
+        const value = await this.adapter.getForeignStateAsync(`${this.adapter.namespace}.${device.name}.${state}`);
+        return value ? value.val : null;
+    }
+
+    /** Switch the TV on if it is off, off otherwise */
+    public async togglePower(id: string): Promise<DeviceRefreshResponse<string>> {
+        const device = this.service.findDevice(id);
+        if (device) {
+            await this.service.control(device, 'power', !(await this.stateOf(device, 'state.power')));
+        }
+        return { refresh: 'none' };
+    }
+
+    public async setVolume(id: string, context: ActionContext): Promise<DeviceRefreshResponse<string>> {
+        const device = this.service.findDevice(id);
+        if (!device) {
+            return { refresh: 'devices' };
+        }
+        const current = Number(await this.stateOf(device, 'state.volume'));
+        const data = await context.showForm(
+            {
+                type: 'panel',
+                items: {
+                    volume: {
+                        type: 'slider',
+                        label: t('Volume'),
+                        min: 0,
+                        max: 100,
+                        step: 1,
+                        unit: '%',
+                        default: Number.isFinite(current) ? current : 0,
+                        xs: 12,
+                    },
+                },
+            },
+            { title: t('Set the volume'), buttons: ['cancel', 'apply'] },
+        );
+        if (data) {
+            try {
+                await this.service.control(device, 'volume', Number(data.volume));
+            } catch (error) {
+                await context.showMessage(this.errorMessage('Volume failed', error));
+            }
+        }
+        return { refresh: 'none' };
+    }
+
+    public async unmute(id: string): Promise<DeviceRefreshResponse<string>> {
+        const device = this.service.findDevice(id);
+        if (device) {
+            await this.service.control(device, 'muted', false);
+        }
+        return { refresh: 'none' };
     }
 
     public discoveredDeviceInfo(device: TDevice): DeviceInfo<string> {

@@ -46,6 +46,8 @@
     "No added devices": "尚未添加电视。",
     "No discovered devices": "没有发现其他电视。",
     "Not paired": "未配对",
+    "Off": "关",
+    "On": "开",
     "One TV found": "找到 %s 台电视。",
     "Pair": "一对",
     "Pair again": "重新配对",
@@ -74,6 +76,7 @@
     "Scenes help": "场景会依次发送多个按键、应用和输入源，例如 HOME, YOUTUBE, WAIT 3000, OK。步骤：按键（HOME、UP、SELECT 或 OK、BACK、1、VOLUP、KEY_...）、应用（YOUTUBE、NETFLIX、DISNEY_PLUS...）、输入源（TV、HDMI1、HDMI2...）和暂停（WAIT 2000）。每个场景都会得到一个按钮 <TV>.scenes.<名称>。",
     "Seconds": "秒",
     "Send a test key?": "发送测试按键吗？电视随后会显示信息栏。",
+    "Set the volume": "设置音量",
     "Set token": "设置令牌",
     "Set token failed": "设置令牌失败",
     "Set up the inputs now?": "现在设置输入源（HDMI、TV...）吗？较新的电视只能通过信号源菜单切换输入，需要输入一次菜单顺序。",
@@ -84,6 +87,8 @@
     "Stable ID": "稳定 ID",
     "Stable identity note": "MAC 地址用于跟随 DHCP 地址更改。友好名称定义对象路径。",
     "Steps": "步骤",
+    "Switch on or off": "开机或关机",
+    "Switch the sound on": "打开声音",
     "TV": "电视",
     "TVs found": "找到 %s 台电视。",
     "Test connection": "发送测试按键",
@@ -98,6 +103,7 @@
     "Unknown": "未知",
     "Unknown device": "未知设备",
     "Volume": "音量",
+    "Volume failed": "设置音量失败",
     "mDNS services": "mDNS 服务",
     "ms": "毫秒"
 }

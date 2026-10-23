@@ -106,6 +106,8 @@ const UPNP_REQUEST_TIMEOUT = 1500;
 const DEVICE_ERROR_QUALITY = 0x44;
 const POWER_POLL_INTERVAL = 2000;
 const POWER_POLL_DURATION = 30000;
+/** How long KEY_POWER is held to switch The Frame off instead of to Art Mode, in ms */
+const FRAME_POWER_OFF_HOLD = 3000;
 
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 const xmlParser = new XMLParser({ ignoreAttributes: false });
@@ -2159,6 +2161,10 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
     );
     if (on) {
         if (status.power) {
+            // The Frame reports "on" in Art Mode as well; switching on means showing TV again
+            if (device.frameTv && (await adapter.getStateAsync(`${device.name}.control.artMode`))?.val === true) {
+                await setArtModeOf(device, false);
+            }
             return;
         }
         if (device.api === 'hj') {
@@ -2185,6 +2191,15 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
                 }
             }
         } else {
+            // Wake-on-LAN first, also while the TV still answers in standby: on The Frame 2022 it switches
+            // the TV on within ~6 s, while KEY_POWER in standby once left the TV in deep standby. KEY_POWER
+            // follows only if the TV is not on after 10 s.
+            if (adapter.config.enableWol && device.mac) {
+                wol.wake(device.mac);
+                scheduleDevicePoll(device, 6000);
+                schedulePowerFallback(device, true, 'KEY_POWER', 10000);
+                return;
+            }
             if (status.online) {
                 try {
                     await sendKey(device, 'KEY_POWER');
@@ -2213,6 +2228,20 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
                 scheduleDevicePoll(device, 3000);
                 return;
             }
+        }
+        if (device.frameTv && device.api === 'tizen') {
+            // a short KEY_POWER only switches The Frame to Art Mode; held for 3 s it switches it off
+            await tizenSend(
+                device,
+                ['Press', 'Release'].map(Cmd => ({
+                    method: 'ms.remote.control',
+                    params: { Cmd, DataOfCmd: 'KEY_POWER', Option: 'false', TypeOfRemote: 'SendRemoteKey' },
+                })),
+                FRAME_POWER_OFF_HOLD,
+            );
+            markSeen(device);
+            scheduleDevicePoll(device, 5000);
+            return;
         }
         await sendKey(device, 'KEY_POWER');
         scheduleDevicePoll(device, 3000);
