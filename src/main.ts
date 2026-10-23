@@ -1021,6 +1021,7 @@ async function ensureDeviceObjects(device: RuntimeDevice): Promise<void> {
     await ensureState(`${base}.control.mute`, 'Mute', 'boolean', 'button', false, false);
     await ensureState(`${base}.control.channelUp`, 'Channel Up', 'boolean', 'button', false, false);
     await ensureState(`${base}.control.channelDown`, 'Channel Down', 'boolean', 'button', false, false);
+    await ensureState(`${base}.control.home`, 'Home', 'boolean', 'button', false, false);
     await ensureState(`${base}.control.launchApp`, 'Launch App', 'string', 'media.app', '', false, {
         states: appStatesOf(device),
     });
@@ -1315,11 +1316,17 @@ async function setArtModeOf(device: RuntimeDevice, on: boolean): Promise<void> {
         throw new Error(`${device.name} has no Art Mode`);
     }
     const url = artChannelUrl(device.ip, tizenTokenOf(device));
-    device.artSwitchUntil = Date.now() + 15000;
+    device.artSwitchUntil = Date.now() + 20000;
     try {
         // the TV reports no art_mode_changed if nothing changes
         if ((await getArtMode(url)) !== on) {
             await setArtMode(url, on);
+            if (!on) {
+                // off leaves the TV in the art selection; the source menu opens on the last input
+                await sendKey(device, 'KEY_SOURCE');
+                await sleep(SOURCE_MENU_DELAY);
+                await sendKey(device, 'KEY_ENTER');
+            }
         }
     } finally {
         device.artSwitchUntil = 0;
@@ -2004,6 +2011,7 @@ async function runSceneSteps(
 /** Switch the TV on and wait until it reports so, at most `POWER_POLL_DURATION` */
 async function switchOnAndWait(device: RuntimeDevice): Promise<void> {
     await handleControl(device, `${device.name}.control.power`, 'power', true);
+    await device.wakeTask;
     const until = Date.now() + POWER_POLL_DURATION;
     while (Date.now() < until) {
         if ((await checkDeviceStatus(device)).power) {
@@ -2072,6 +2080,8 @@ async function handleControl(
             return sendButton(device, id, 'KEY_CHUP', value);
         case 'channelDown':
             return sendButton(device, id, 'KEY_CHDOWN', value);
+        case 'home':
+            return sendButton(device, id, 'KEY_HOME', value);
         case 'launchApp':
             if (typeof value === 'string' && value.trim()) {
                 await launchAppOf(device, value.trim());
@@ -2322,6 +2332,11 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
                 sendWol(device);
                 scheduleDevicePoll(device, 6000);
                 schedulePowerFallback(device, true, 'KEY_POWER', 10000);
+                if (device.frameTv) {
+                    device.wakeTask = showTvAfterWake(device)
+                        .catch(e => adapter.log.warn(`${device.name} stays in Art Mode: ${errorMessage(e)}`))
+                        .finally(() => (device.wakeTask = undefined));
+                }
                 return;
             }
             if (status.online) {
@@ -2385,6 +2400,31 @@ function sendWol(device: RuntimeDevice): void {
             adapter.log.info(`Wake-on-LAN for ${device.name} (${device.mac}) sent to ${targets.join(', ')}`),
         )
         .catch(e => adapter.log.warn(`Wake-on-LAN for ${device.name} failed: ${errorMessage(e)}`));
+}
+
+/** The Frame wakes up in Art Mode; switching on means TV, so leave Art Mode once the TV is on */
+async function showTvAfterWake(device: RuntimeDevice): Promise<void> {
+    const until = Date.now() + POWER_POLL_DURATION;
+    while (!(await checkDeviceStatus(device)).power) {
+        if (Date.now() > until) {
+            return;
+        }
+        await sleep(POWER_POLL_INTERVAL);
+    }
+    // the art channel answers only a few seconds after waking up
+    for (let attempt = 1; ; attempt++) {
+        try {
+            if (await getArtMode(artChannelUrl(device.ip, tizenTokenOf(device)))) {
+                await setArtModeOf(device, false);
+            }
+            return;
+        } catch (e) {
+            if (attempt === 5) {
+                throw e;
+            }
+            await sleep(2000);
+        }
+    }
 }
 
 function schedulePowerFallback(device: RuntimeDevice, targetOn: boolean, fallbackKey: string, delayMs: number): void {
@@ -2673,7 +2713,7 @@ async function tizenSend(device: RuntimeDevice, payload: JsonObject | JsonObject
 }
 
 function buildTizenWsCandidates(
-    device: Pick<RuntimeDevice, 'ip' | 'protocol' | 'port'>,
+    device: Pick<RuntimeDevice, 'ip' | 'protocol' | 'port' | 'tokenAuthSupport'>,
     token: string,
     apiVersions: string | string[] = ['v2'],
 ): string[] {
@@ -2694,6 +2734,12 @@ function buildTizenWsCandidates(
         candidates.push(url);
     };
 
+    // a TV with token authentication accepts the remote only on 8002; trying 8001 first costs ~2.5 s per key
+    if (device.tokenAuthSupport) {
+        for (const v of versions) {
+            add('wss', 8002, v);
+        }
+    }
     if (device.protocol && device.port) {
         for (const v of versions) {
             add(device.protocol, device.port, v);

@@ -68,7 +68,7 @@ Per TV:
 - `samsungtv.0.<tvname>.state.*`
     - `power`, `volume`, `muted`
 - `samsungtv.0.<tvname>.control.*`
-    - `power`, `wol`, `key`, `volumeUp`, `volumeDown`, `mute`, `channelUp`, `channelDown`, `launchApp`, `source`
+    - `power`, `wol`, `key`, `home`, `volumeUp`, `volumeDown`, `mute`, `channelUp`, `channelDown`, `launchApp`, `source`
     - `volume`, `muted`
     - `artMode` (only The Frame)
 - `samsungtv.0.<tvname>.scenes.*`: one button per scene of the **Scenes** tab
@@ -92,8 +92,10 @@ the role `indicator`: as `media.mute` the type-detector would take this read-onl
   [Inputs](#inputs).
 - `control.power`: `true` switches on, `false` off. Tizen TVs are woken with Wake-on-LAN first (if enabled and
   the MAC address is known), also while they still answer in standby; `KEY_POWER` follows only if the TV is not on
-  after 10 s. On The Frame, switching on in Art Mode leaves Art Mode, and switching off holds `KEY_POWER` for 3 s,
-  because a short press only switches to Art Mode.
+  after 10 s. The Frame wakes up in Art Mode; switching it on means TV, so the adapter leaves Art Mode once it is on.
+  Switching off holds `KEY_POWER` for 3 s, because a short press may only switch to Art Mode.
+- `control.artMode`: `false` shows TV again: Art Mode off leaves the TV in the art selection, so the adapter then
+  opens the source menu, which starts on the last input, and confirms it.
 - `control.volume`: absolute volume from 0 to 100
 - `control.muted`: mute on or off, as opposed to `control.mute`, which toggles
 
@@ -101,8 +103,8 @@ While a TV is off, only `control.power` and `control.wol` are executed. Every ot
 volume, Art Mode, scenes without `ON` - is ignored with an info in the log, and its state is set back. Before
 ignoring a command the adapter asks the TV once more, in case it was just switched on with its own remote control.
 The remote control tab disables all keys but power while the TV is off.
-- `control.artMode`: Art Mode of The Frame on or off. It is read on every poll and switched over the art channel
-  of the TV; the adapter waits until the TV reports the change.
+
+- `control.artMode`: Art Mode of The Frame on or off, read on every poll.
 
 ### Inputs
 
@@ -181,6 +183,7 @@ Note: not every TV supports every key. Some keys only work when a menu/focus is 
 - (@GermanBluefox) Control power, volume, mute, input, app and Art Mode from the Device Manager card; large cards.
 - (@GermanBluefox) Switch Tizen TVs on with Wake-on-LAN first; switch The Frame off instead of to Art Mode.
 - (@GermanBluefox) Send Wake-on-LAN to the broadcast address of every network interface, not only to 255.255.255.255, and log it.
+- (@GermanBluefox) The Frame: switching on and Art Mode off show TV with the last input; add `control.home`; token TVs use port 8002 first.
 - (@GermanBluefox) Add `info.unreach`; `state.muted` gets the role `indicator`, `state.volume` a range, so the type-detector finds the right states.
 
 ### 0.0.28
