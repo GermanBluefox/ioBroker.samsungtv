@@ -27,6 +27,14 @@ describe('scenes', () => {
         assert.deepEqual(parseScene(' , pause 999999,,'), [{ type: 'wait', ms: 60000 }]);
     });
 
+    it('switches the TV on with ON', () => {
+        assert.deepEqual(parseScene('on, Power On, YOUTUBE'), [
+            { type: 'on' },
+            { type: 'on' },
+            { type: 'app', app: 'YOUTUBE' },
+        ]);
+    });
+
     it('names the step it does not understand', () => {
         assert.throws(() => parseScene('HOME, YOUTUBEE, OK'), /Unknown step "YOUTUBEE"/);
     });
@@ -48,13 +56,16 @@ describe('scenes', () => {
 
     it('runs the steps in order with the delay in between', async () => {
         const calls: string[] = [];
-        await runScene(parseScene('HOME, YOUTUBE, WAIT 3000, HDMI1'), 700, {
+        await runScene(parseScene('ON, HOME, YOUTUBE, WAIT 3000, HDMI1'), 700, {
+            powerOn: () => Promise.resolve(void calls.push('on')),
             sendKey: key => Promise.resolve(void calls.push(key)),
             launchApp: app => Promise.resolve(void calls.push(`app ${app}`)),
             selectInput: input => Promise.resolve(void calls.push(`input ${input}`)),
             sleep: ms => Promise.resolve(void calls.push(`sleep ${ms}`)),
         });
         assert.deepEqual(calls, [
+            'on',
+            'sleep 700',
             'KEY_HOME',
             'sleep 700',
             'app YOUTUBE',

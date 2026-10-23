@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "L'instance ne répond pas",
     "custom_samsungtv_no_tv": "Aucun téléviseur ajouté - ajoutez-en un dans l'onglet « Gestion des appareils »",
     "custom_samsungtv_apps_reload": "Rechercher à nouveau les applications sur le téléviseur",
-    "custom_samsungtv_hint": "Cliquez dans la télécommande et utilisez les flèches, Entrée, Retour arrière, + et - du clavier"
+    "custom_samsungtv_hint": "Cliquez dans la télécommande et utilisez les flèches, Entrée, Retour arrière, + et - du clavier",
+    "custom_samsungtv_switch_on_first": "Le téléviseur est éteint - allumez-le avec la touche marche pour utiliser les autres touches",
+    "custom_samsungtv_steps_power": "Alimentation",
+    "custom_samsungtv_steps_on": "Allumer et attendre",
+    "custom_samsungtv_steps_apps": "Applications",
+    "custom_samsungtv_steps_inputs": "Entrées",
+    "custom_samsungtv_steps_keys": "Touches",
+    "custom_samsungtv_steps_pauses": "Pauses",
+    "custom_samsungtv_steps_wait": "Attendre %s s",
+    "custom_samsungtv_steps_add": "Ajouter une étape...",
+    "custom_samsungtv_steps_text": "Modifier en texte",
+    "custom_samsungtv_steps_list": "Modifier avec la liste",
+    "custom_samsungtv_steps_unknown": "L'adaptateur ne connaît pas cette étape"
 }

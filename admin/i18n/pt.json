@@ -73,7 +73,7 @@
     "Scan schedule": "Intervalos de verificação e status",
     "Scanning": "Digitalizando...",
     "Scenes": "Cenas",
-    "Scenes help": "Uma cena envia várias teclas, apps e entradas uma após a outra, por exemplo HOME, YOUTUBE, WAIT 3000, OK. Passos: teclas (HOME, UP, SELECT ou OK, BACK, 1, VOLUP, KEY_...), apps (YOUTUBE, NETFLIX, DISNEY_PLUS...), entradas (TV, HDMI1, HDMI2...) e pausas (WAIT 2000). Cada cena recebe um botão <TV>.scenes.<nome>.",
+    "Scenes help": "Uma cena envia várias teclas, apps e entradas uma após a outra, por exemplo HOME, YOUTUBE, WAIT 3000, OK. Passos: teclas (HOME, UP, SELECT ou OK, BACK, 1, VOLUP, KEY_...), apps (YOUTUBE, NETFLIX, DISNEY_PLUS...), entradas (TV, HDMI1, HDMI2...) e pausas (WAIT 2000). Cada cena recebe um botão <TV>.scenes.<nome>. Comece com ON para ligar a TV primeiro; sem isso, a cena só é executada com a TV ligada.",
     "Seconds": "segundos",
     "Send a test key?": "Enviar uma tecla de teste? A TV mostrará a faixa de informações.",
     "Set the volume": "Ajustar o volume",

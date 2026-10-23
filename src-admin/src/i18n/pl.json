@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "Instancja nie odpowiada",
     "custom_samsungtv_no_tv": "Nie dodano jeszcze telewizora - dodaj go na karcie „Zarządzanie urządzeniami”",
     "custom_samsungtv_apps_reload": "Ponownie wyszukaj aplikacje na telewizorze",
-    "custom_samsungtv_hint": "Kliknij pilota i używaj strzałek, Enter, Backspace, + i - na klawiaturze"
+    "custom_samsungtv_hint": "Kliknij pilota i używaj strzałek, Enter, Backspace, + i - na klawiaturze",
+    "custom_samsungtv_switch_on_first": "Telewizor jest wyłączony - włącz go przyciskiem zasilania, aby używać pozostałych przycisków",
+    "custom_samsungtv_steps_power": "Zasilanie",
+    "custom_samsungtv_steps_on": "Włącz i poczekaj",
+    "custom_samsungtv_steps_apps": "Aplikacje",
+    "custom_samsungtv_steps_inputs": "Wejścia",
+    "custom_samsungtv_steps_keys": "Klawisze",
+    "custom_samsungtv_steps_pauses": "Pauzy",
+    "custom_samsungtv_steps_wait": "Czekaj %s s",
+    "custom_samsungtv_steps_add": "Dodaj krok...",
+    "custom_samsungtv_steps_text": "Edytuj jako tekst",
+    "custom_samsungtv_steps_list": "Edytuj za pomocą listy",
+    "custom_samsungtv_steps_unknown": "Adapter nie zna tego kroku"
 }

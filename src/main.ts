@@ -1783,15 +1783,66 @@ function onStateChange(id: string, state: ioBroker.State | null | undefined): vo
     if (channel === 'scenes') {
         if (isTruthyValue(state.val)) {
             runSceneOf(device, command)
+                .catch(e =>
+                    e instanceof TvOffError
+                        ? adapter.log.info(e.message)
+                        : adapter.log.warn(`Scene ${command} of ${device.name} failed: ${errorMessage(e)}`),
+                )
                 .then(() => adapter.setStateAsync(id, false, true))
-                .catch(e => adapter.log.warn(`Scene ${command} of ${device.name} failed: ${errorMessage(e)}`));
+                .catch(() => {
+                    // the instance is stopping
+                });
         }
         return;
     }
 
     handleControl(device, id, command, state.val).catch(e => {
+        if (e instanceof TvOffError) {
+            adapter.log.info(e.message);
+            return restoreControlState(device, id, command);
+        }
         adapter.log.warn(`Failed to execute ${command} for ${device.name}: ${errorMessage(e)}`);
     });
+}
+
+/** A command other than switching on was sent while the TV is off */
+class TvOffError extends Error {
+    constructor(device: RuntimeDevice, command: string) {
+        super(`${device.displayName || device.name} is off - ${command} ignored, switch it on first`);
+        this.name = 'TvOffError';
+    }
+}
+
+/** Commands that work while the TV is off */
+const COMMANDS_WHILE_OFF = new Set(['power', 'wol']);
+
+/**
+ * Let a command through only while the TV is on. The polled state may be up to one poll interval old -
+ * the TV may just have been switched on with its own remote - so an "off" is checked with the TV once more.
+ */
+async function requirePowerOn(device: RuntimeDevice, command: string): Promise<void> {
+    if ((await adapter.getStateAsync(`${device.name}.state.power`))?.val === true) {
+        return;
+    }
+    await pollDevice(device);
+    if ((await adapter.getStateAsync(`${device.name}.state.power`))?.val !== true) {
+        throw new TvOffError(device, command);
+    }
+}
+
+/** Put a control state that was written while the TV is off back to what is true */
+async function restoreControlState(device: RuntimeDevice, id: string, command: string): Promise<void> {
+    const mirrored: Record<string, string> = { volume: 'state.volume', muted: 'state.muted' };
+    let value: ioBroker.StateValue;
+    if (mirrored[command]) {
+        value = (await adapter.getStateAsync(`${device.name}.${mirrored[command]}`))?.val ?? null;
+    } else if (command === 'key' || command === 'launchApp' || command === 'source') {
+        value = '';
+    } else {
+        // buttons and Art Mode
+        value = false;
+    }
+    await adapter.setStateAsync(id, value, true);
 }
 
 /**
@@ -1833,6 +1884,10 @@ async function handleMessage(command: string, message: JsonObject): Promise<unkn
     const device = devicesByName.get(asString(message.device));
     if (!device) {
         return { error: `Unknown TV ${asString(message.device)}` };
+    }
+    // the remote control tab: everything but power needs the TV on; the list of known apps does not
+    if (command !== 'power' && (command !== 'apps' || message.refresh)) {
+        await requirePowerOn(device, command);
     }
     switch (command) {
         case 'remote': {
@@ -1880,10 +1935,15 @@ async function runSceneOf(device: RuntimeDevice, id: string): Promise<void> {
     if (runningScenes.has(device.id)) {
         throw new Error('Another scene is still running on this TV');
     }
+    // a scene that begins with ON switches the TV on itself
+    if (scene.steps[0]?.type !== 'on') {
+        await requirePowerOn(device, `scene ${scene.name}`);
+    }
     runningScenes.add(device.id);
     try {
         adapter.log.debug(`Scene ${scene.name} on ${device.name}: ${scene.steps.length} steps`);
         await runScene(scene.steps, scene.delay, {
+            powerOn: () => switchOnAndWait(device),
             sendKey: key => sendKey(device, key),
             launchApp: app => launchAppOf(device, app),
             selectInput: input => selectSource(device, input),
@@ -1892,6 +1952,20 @@ async function runSceneOf(device: RuntimeDevice, id: string): Promise<void> {
     } finally {
         runningScenes.delete(device.id);
     }
+}
+
+/** Switch the TV on and wait until it reports so, at most `POWER_POLL_DURATION` */
+async function switchOnAndWait(device: RuntimeDevice): Promise<void> {
+    await handleControl(device, `${device.name}.control.power`, 'power', true);
+    const until = Date.now() + POWER_POLL_DURATION;
+    while (Date.now() < until) {
+        if ((await checkDeviceStatus(device)).power) {
+            await adapter.setStateAsync(`${device.name}.state.power`, true, true);
+            return;
+        }
+        await sleep(POWER_POLL_INTERVAL);
+    }
+    throw new Error(`${device.displayName || device.name} did not switch on`);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -1904,6 +1978,9 @@ async function handleControl(
     command: string,
     value: ioBroker.StateValue,
 ): Promise<void> {
+    if (!COMMANDS_WHILE_OFF.has(command)) {
+        await requirePowerOn(device, command);
+    }
     switch (command) {
         case 'power':
             await setPower(device, !!value);

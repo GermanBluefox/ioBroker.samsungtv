@@ -73,7 +73,7 @@
     "Scan schedule": "扫描和状态间隔",
     "Scanning": "扫描...",
     "Scenes": "场景",
-    "Scenes help": "场景会依次发送多个按键、应用和输入源，例如 HOME, YOUTUBE, WAIT 3000, OK。步骤：按键（HOME、UP、SELECT 或 OK、BACK、1、VOLUP、KEY_...）、应用（YOUTUBE、NETFLIX、DISNEY_PLUS...）、输入源（TV、HDMI1、HDMI2...）和暂停（WAIT 2000）。每个场景都会得到一个按钮 <TV>.scenes.<名称>。",
+    "Scenes help": "场景会依次发送多个按键、应用和输入源，例如 HOME, YOUTUBE, WAIT 3000, OK。步骤：按键（HOME、UP、SELECT 或 OK、BACK、1、VOLUP、KEY_...）、应用（YOUTUBE、NETFLIX、DISNEY_PLUS...）、输入源（TV、HDMI1、HDMI2...）和暂停（WAIT 2000）。每个场景都会得到一个按钮 <TV>.scenes.<名称>。 以 ON 开头可先打开电视；否则场景仅在电视开机时运行。",
     "Seconds": "秒",
     "Send a test key?": "发送测试按键吗？电视随后会显示信息栏。",
     "Set the volume": "设置音量",

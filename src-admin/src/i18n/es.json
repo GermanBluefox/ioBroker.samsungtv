@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "La instancia no responde",
     "custom_samsungtv_no_tv": "Aún no hay ningún televisor - añada uno en la pestaña \"Gestión de dispositivos\"",
     "custom_samsungtv_apps_reload": "Buscar de nuevo las apps en el televisor",
-    "custom_samsungtv_hint": "Haga clic en el mando y use las flechas, Intro, Retroceso, + y - del teclado"
+    "custom_samsungtv_hint": "Haga clic en el mando y use las flechas, Intro, Retroceso, + y - del teclado",
+    "custom_samsungtv_switch_on_first": "El televisor está apagado - enciéndalo con la tecla de encendido para usar las demás teclas",
+    "custom_samsungtv_steps_power": "Encendido",
+    "custom_samsungtv_steps_on": "Encender y esperar",
+    "custom_samsungtv_steps_apps": "Apps",
+    "custom_samsungtv_steps_inputs": "Entradas",
+    "custom_samsungtv_steps_keys": "Teclas",
+    "custom_samsungtv_steps_pauses": "Pausas",
+    "custom_samsungtv_steps_wait": "Esperar %s s",
+    "custom_samsungtv_steps_add": "Añadir paso...",
+    "custom_samsungtv_steps_text": "Editar como texto",
+    "custom_samsungtv_steps_list": "Editar con la lista",
+    "custom_samsungtv_steps_unknown": "El adaptador no conoce este paso"
 }

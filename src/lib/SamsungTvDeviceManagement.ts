@@ -338,7 +338,7 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
                 id: 'unmute',
                 icon: MUTED_ICON,
                 description: t('Switch the sound on'),
-                handler: id => this.unmute(id),
+                handler: (id, context) => this.unmute(id, context),
             },
         );
         // before rename and delete
@@ -559,10 +559,14 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
         return { refresh: 'none' };
     }
 
-    public async unmute(id: string): Promise<DeviceRefreshResponse<string>> {
+    public async unmute(id: string, context: ActionContext): Promise<DeviceRefreshResponse<string>> {
         const device = this.service.findDevice(id);
         if (device) {
-            await this.service.control(device, 'muted', false);
+            try {
+                await this.service.control(device, 'muted', false);
+            } catch (error) {
+                await context.showMessage(this.errorMessage('Volume failed', error));
+            }
         }
         return { refresh: 'none' };
     }

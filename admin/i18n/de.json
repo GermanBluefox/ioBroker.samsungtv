@@ -73,7 +73,7 @@
     "Scan schedule": "Scan- und Statusintervalle",
     "Scanning": "Suche läuft...",
     "Scenes": "Szenen",
-    "Scenes help": "Eine Szene sendet mehrere Tasten, Apps und Eingänge nacheinander, z. B. HOME, YOUTUBE, WAIT 3000, OK. Schritte: Tasten (HOME, UP, SELECT oder OK, BACK, 1, VOLUP, KEY_...), Apps (YOUTUBE, NETFLIX, DISNEY_PLUS ...), Eingänge (TV, HDMI1, HDMI2 ...) und Pausen (WAIT 2000). Jede Szene bekommt einen Knopf <TV>.scenes.<Name>.",
+    "Scenes help": "Eine Szene sendet mehrere Tasten, Apps und Eingänge nacheinander, z. B. HOME, YOUTUBE, WAIT 3000, OK. Schritte: Tasten (HOME, UP, SELECT oder OK, BACK, 1, VOLUP, KEY_...), Apps (YOUTUBE, NETFLIX, DISNEY_PLUS ...), Eingänge (TV, HDMI1, HDMI2 ...) und Pausen (WAIT 2000). Jede Szene bekommt einen Knopf <TV>.scenes.<Name>. Mit ON am Anfang schaltet die Szene den TV zuerst ein; ohne ON läuft sie nur, wenn der TV an ist.",
     "Seconds": "Sekunden",
     "Send a test key?": "Testtaste senden? Der TV zeigt dann seine Info-Einblendung.",
     "Set the volume": "Lautstärke einstellen",

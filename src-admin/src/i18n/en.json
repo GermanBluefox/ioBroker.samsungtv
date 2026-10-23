@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "The instance does not answer",
     "custom_samsungtv_no_tv": "No TV added yet - add one in the tab \"Device management\"",
     "custom_samsungtv_apps_reload": "Look for apps on the TV again",
-    "custom_samsungtv_hint": "Click into the remote control and use the arrow keys, Enter, Backspace, + and - of the keyboard"
+    "custom_samsungtv_hint": "Click into the remote control and use the arrow keys, Enter, Backspace, + and - of the keyboard",
+    "custom_samsungtv_switch_on_first": "The TV is off - switch it on with the power key to use the other keys",
+    "custom_samsungtv_steps_power": "Power",
+    "custom_samsungtv_steps_on": "Switch on and wait",
+    "custom_samsungtv_steps_apps": "Apps",
+    "custom_samsungtv_steps_inputs": "Inputs",
+    "custom_samsungtv_steps_keys": "Keys",
+    "custom_samsungtv_steps_pauses": "Pauses",
+    "custom_samsungtv_steps_wait": "Wait %s s",
+    "custom_samsungtv_steps_add": "Add a step...",
+    "custom_samsungtv_steps_text": "Edit as text",
+    "custom_samsungtv_steps_list": "Edit with the list",
+    "custom_samsungtv_steps_unknown": "The adapter does not know this step"
 }

@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "L'istanza non risponde",
     "custom_samsungtv_no_tv": "Nessun televisore aggiunto - aggiungine uno nella scheda \"Gestione dispositivi\"",
     "custom_samsungtv_apps_reload": "Cerca di nuovo le app sul televisore",
-    "custom_samsungtv_hint": "Fai clic sul telecomando e usa le frecce, Invio, Backspace, + e - della tastiera"
+    "custom_samsungtv_hint": "Fai clic sul telecomando e usa le frecce, Invio, Backspace, + e - della tastiera",
+    "custom_samsungtv_switch_on_first": "Il televisore è spento - accendilo con il tasto di accensione per usare gli altri tasti",
+    "custom_samsungtv_steps_power": "Accensione",
+    "custom_samsungtv_steps_on": "Accendi e attendi",
+    "custom_samsungtv_steps_apps": "App",
+    "custom_samsungtv_steps_inputs": "Ingressi",
+    "custom_samsungtv_steps_keys": "Tasti",
+    "custom_samsungtv_steps_pauses": "Pause",
+    "custom_samsungtv_steps_wait": "Attendi %s s",
+    "custom_samsungtv_steps_add": "Aggiungi un passo...",
+    "custom_samsungtv_steps_text": "Modifica come testo",
+    "custom_samsungtv_steps_list": "Modifica con l'elenco",
+    "custom_samsungtv_steps_unknown": "L'adattatore non conosce questo passo"
 }

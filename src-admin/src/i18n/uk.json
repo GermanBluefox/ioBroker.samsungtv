@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "Екземпляр не відповідає",
     "custom_samsungtv_no_tv": "Телевізор ще не додано - додайте його на вкладці «Керування пристроями»",
     "custom_samsungtv_apps_reload": "Знову знайти застосунки на телевізорі",
-    "custom_samsungtv_hint": "Клацніть по пульту й використовуйте стрілки, Enter, Backspace, + і - клавіатури"
+    "custom_samsungtv_hint": "Клацніть по пульту й використовуйте стрілки, Enter, Backspace, + і - клавіатури",
+    "custom_samsungtv_switch_on_first": "Телевізор вимкнений - увімкніть його кнопкою живлення, щоб користуватися іншими кнопками",
+    "custom_samsungtv_steps_power": "Живлення",
+    "custom_samsungtv_steps_on": "Увімкнути й зачекати",
+    "custom_samsungtv_steps_apps": "Застосунки",
+    "custom_samsungtv_steps_inputs": "Входи",
+    "custom_samsungtv_steps_keys": "Кнопки",
+    "custom_samsungtv_steps_pauses": "Паузи",
+    "custom_samsungtv_steps_wait": "Чекати %s с",
+    "custom_samsungtv_steps_add": "Додати крок...",
+    "custom_samsungtv_steps_text": "Редагувати як текст",
+    "custom_samsungtv_steps_list": "Редагувати списком",
+    "custom_samsungtv_steps_unknown": "Адаптер не знає цього кроку"
 }

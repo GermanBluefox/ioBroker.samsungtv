@@ -1,3 +1,4 @@
 import RemoteControlComponent from './RemoteControlComponent';
+import SceneStepsComponent from './SceneStepsComponent';
 
-export default { RemoteControlComponent };
+export default { RemoteControlComponent, SceneStepsComponent };

@@ -73,7 +73,7 @@
     "Scan schedule": "Scan and status intervals",
     "Scanning": "Scanning...",
     "Scenes": "Scenes",
-    "Scenes help": "A scene sends several keys, apps and inputs one after the other, e.g. HOME, YOUTUBE, WAIT 3000, OK. Steps: keys (HOME, UP, SELECT or OK, BACK, 1, VOLUP, KEY_...), apps (YOUTUBE, NETFLIX, DISNEY_PLUS...), inputs (TV, HDMI1, HDMI2...) and pauses (WAIT 2000). Every scene gets a button <TV>.scenes.<name>.",
+    "Scenes help": "A scene sends several keys, apps and inputs one after the other, e.g. HOME, YOUTUBE, WAIT 3000, OK. Steps: keys (HOME, UP, SELECT or OK, BACK, 1, VOLUP, KEY_...), apps (YOUTUBE, NETFLIX, DISNEY_PLUS...), inputs (TV, HDMI1, HDMI2...) and pauses (WAIT 2000). Every scene gets a button <TV>.scenes.<name>. Begin with ON to switch the TV on first; without it a scene runs only while the TV is on.",
     "Seconds": "seconds",
     "Send a test key?": "Send a test key? The TV then shows its info banner.",
     "Set the volume": "Set the volume",

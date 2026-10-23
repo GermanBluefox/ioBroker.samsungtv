@@ -94,6 +94,11 @@ their fixed values in `common.states`, so visualizations and the devices adapter
   because a short press only switches to Art Mode.
 - `control.volume`: absolute volume from 0 to 100
 - `control.muted`: mute on or off, as opposed to `control.mute`, which toggles
+
+While a TV is off, only `control.power` and `control.wol` are executed. Every other command - keys, apps, inputs,
+volume, Art Mode, scenes without `ON` - is ignored with an info in the log, and its state is set back. Before
+ignoring a command the adapter asks the TV once more, in case it was just switched on with its own remote control.
+The remote control tab disables all keys but power while the TV is off.
 - `control.artMode`: Art Mode of The Frame on or off. It is read on every poll and switched over the art channel
   of the TV; the adapter waits until the TV reports the change.
 
@@ -108,7 +113,9 @@ TV: press SOURCE on the remote control and write down the entries to the right o
 
 The **Scenes** tab holds named sequences, e.g. `HOME, YOUTUBE, WAIT 3000, OK` to open YouTube and confirm the
 account selection. A step is a key (`HOME`, `OK`, `1`, `KEY_...`), an app (`YOUTUBE`), an input (`HDMI2`) or a
-pause (`WAIT 2000`); the pause between two steps is configurable. A scene belongs to one TV or to all of them and
+pause (`WAIT 2000`); the pause between two steps is configurable. A scene runs only while the TV is on,
+unless it begins with `ON`, which switches the TV on and waits for it, e.g. `ON, YOUTUBE`. In the settings the
+steps are picked from a list (switching on, keys, the apps and inputs of the TV, pauses) or typed as text. A scene belongs to one TV or to all of them and
 is started with its button `samsungtv.0.<tvname>.scenes.<name>` or from the **Remote control** tab.
 
 ### Remote control tab

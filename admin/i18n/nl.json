@@ -73,7 +73,7 @@
     "Scan schedule": "Scan- en statusintervallen",
     "Scanning": "Scannen...",
     "Scenes": "Scènes",
-    "Scenes help": "Een scène stuurt meerdere toetsen, apps en ingangen na elkaar, bijv. HOME, YOUTUBE, WAIT 3000, OK. Stappen: toetsen (HOME, UP, SELECT of OK, BACK, 1, VOLUP, KEY_...), apps (YOUTUBE, NETFLIX, DISNEY_PLUS...), ingangen (TV, HDMI1, HDMI2...) en pauzes (WAIT 2000). Elke scène krijgt een knop <TV>.scenes.<naam>.",
+    "Scenes help": "Een scène stuurt meerdere toetsen, apps en ingangen na elkaar, bijv. HOME, YOUTUBE, WAIT 3000, OK. Stappen: toetsen (HOME, UP, SELECT of OK, BACK, 1, VOLUP, KEY_...), apps (YOUTUBE, NETFLIX, DISNEY_PLUS...), ingangen (TV, HDMI1, HDMI2...) en pauzes (WAIT 2000). Elke scène krijgt een knop <TV>.scenes.<naam>. Begin met ON om de tv eerst in te schakelen; zonder ON loopt een scène alleen als de tv aan staat.",
     "Seconds": "seconden",
     "Send a test key?": "Een testtoets sturen? De tv toont dan zijn infobalk.",
     "Set the volume": "Volume instellen",

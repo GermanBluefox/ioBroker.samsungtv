@@ -188,6 +188,14 @@ export default class RemoteControlComponent extends ConfigGeneric<ConfigGenericP
         return `${this.props.oContext.adapterName}.${this.props.oContext.instance}`;
     }
 
+    /**
+     * The TV is known to be off: only the power key works then, the adapter rejects everything else.
+     * While the state is unknown the keys stay usable.
+     */
+    get isOff(): boolean {
+        return this.state.power === false || this.state.online === false;
+    }
+
     get device(): TvInfo | undefined {
         return this.state.devices?.find(device => device.name === this.state.selected);
     }
@@ -378,7 +386,12 @@ export default class RemoteControlComponent extends ConfigGeneric<ConfigGenericP
                 <span>
                     <ButtonBase
                         aria-label={title}
-                        disabled={!this.props.alive || !this.state.selected || (!!this.state.busy && !busy)}
+                        disabled={
+                            !this.props.alive ||
+                            !this.state.selected ||
+                            (!!this.state.busy && !busy) ||
+                            (name !== 'power' && this.isOff)
+                        }
                         onClick={() => void this.send(name, command)}
                         sx={{
                             width: 52,
@@ -495,7 +508,7 @@ export default class RemoteControlComponent extends ConfigGeneric<ConfigGenericP
                         <ButtonBase
                             key={item.id}
                             aria-label={item.title}
-                            disabled={!this.props.alive || (!!this.state.busy && !busy)}
+                            disabled={!this.props.alive || (!!this.state.busy && !busy) || this.isOff}
                             onClick={() => void this.send(item.id, item.command)}
                             sx={{
                                 height: 34,
@@ -553,7 +566,7 @@ export default class RemoteControlComponent extends ConfigGeneric<ConfigGenericP
                 )}
                 <ButtonBase
                     onClick={() => void this.refreshApps()}
-                    disabled={!this.props.alive || !!this.state.busy}
+                    disabled={!this.props.alive || !!this.state.busy || this.isOff}
                     sx={{ color: COLORS.textDim, fontSize: 12, borderRadius: 1, px: 1, gap: 0.5 }}
                 >
                     {this.state.busy === 'apps' ? (
@@ -800,7 +813,8 @@ export default class RemoteControlComponent extends ConfigGeneric<ConfigGenericP
                         fontSize: 14,
                     }}
                 >
-                    {this.state.error || I18n.t('custom_samsungtv_hint')}
+                    {this.state.error ||
+                        I18n.t(this.isOff ? 'custom_samsungtv_switch_on_first' : 'custom_samsungtv_hint')}
                 </Typography>
             </Box>
         );

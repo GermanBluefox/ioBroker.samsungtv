@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "Die Instanz antwortet nicht",
     "custom_samsungtv_no_tv": "Noch kein TV hinzugefügt - füge einen im Tab „TV-Verwaltung“ hinzu",
     "custom_samsungtv_apps_reload": "Apps erneut auf dem TV suchen",
-    "custom_samsungtv_hint": "In die Fernbedienung klicken und mit Pfeiltasten, Enter, Rücktaste, + und - der Tastatur bedienen"
+    "custom_samsungtv_hint": "In die Fernbedienung klicken und mit Pfeiltasten, Enter, Rücktaste, + und - der Tastatur bedienen",
+    "custom_samsungtv_switch_on_first": "Der Fernseher ist aus - mit der Power-Taste einschalten, dann gehen die anderen Tasten",
+    "custom_samsungtv_steps_power": "Einschalten",
+    "custom_samsungtv_steps_on": "Einschalten und warten",
+    "custom_samsungtv_steps_apps": "Apps",
+    "custom_samsungtv_steps_inputs": "Eingänge",
+    "custom_samsungtv_steps_keys": "Tasten",
+    "custom_samsungtv_steps_pauses": "Pausen",
+    "custom_samsungtv_steps_wait": "%s s warten",
+    "custom_samsungtv_steps_add": "Schritt hinzufügen ...",
+    "custom_samsungtv_steps_text": "Als Text bearbeiten",
+    "custom_samsungtv_steps_list": "Mit der Liste bearbeiten",
+    "custom_samsungtv_steps_unknown": "Diesen Schritt kennt der Adapter nicht"
 }

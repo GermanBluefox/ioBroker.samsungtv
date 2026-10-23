@@ -8,6 +8,8 @@
  * - an app: a key of `TV_APPS` (`YOUTUBE`, `NETFLIX`, ...)
  * - an input: a key of `TV_INPUTS` (`HDMI2`, `TV`, ...)
  * - a pause: `WAIT 2000` (milliseconds)
+ * - `ON`: switch the TV on and wait until it is on; only this step works while the TV is off, so a scene
+ *   that starts with it can be started from standby
  * separated by commas, semicolons or new lines; case and spaces do not matter.
  */
 import { TV_APPS, TV_INPUTS, TV_KEY_CODES } from './tvValues';
@@ -34,6 +36,7 @@ const KEY_ALIASES: Readonly<Record<string, string>> = {
 const MAX_WAIT = 60_000;
 
 export type SceneStep =
+    | { type: 'on' }
     | { type: 'key'; key: string }
     | { type: 'app'; app: string }
     | { type: 'input'; input: string }
@@ -69,7 +72,9 @@ export function parseScene(steps: string): SceneStep[] {
             continue;
         }
         const name = token.replace(/ /g, '_');
-        if (/^KEY_[A-Z0-9_]+$/.test(name)) {
+        if (name === 'ON' || name === 'POWER_ON') {
+            result.push({ type: 'on' });
+        } else if (/^KEY_[A-Z0-9_]+$/.test(name)) {
             result.push({ type: 'key', key: name });
         } else if (TV_KEY_CODES[name]) {
             result.push({ type: 'key', key: TV_KEY_CODES[name] });
@@ -103,6 +108,8 @@ export function sceneDelay(delay: unknown): number {
 
 /** What running a scene needs from the adapter */
 export interface SceneRunner {
+    /** Switch the TV on and resolve once it is on */
+    powerOn: () => Promise<void>;
     sendKey: (key: string) => Promise<void>;
     launchApp: (app: string) => Promise<void>;
     selectInput: (input: string) => Promise<void>;
@@ -121,7 +128,9 @@ export async function runScene(steps: SceneStep[], delay: number, runner: SceneR
         if (i > 0 && delay > 0) {
             await runner.sleep(delay);
         }
-        if (step.type === 'key') {
+        if (step.type === 'on') {
+            await runner.powerOn();
+        } else if (step.type === 'key') {
             await runner.sendKey(step.key);
         } else if (step.type === 'app') {
             await runner.launchApp(step.app);

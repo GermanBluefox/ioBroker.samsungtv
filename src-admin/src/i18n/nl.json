@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "De instantie reageert niet",
     "custom_samsungtv_no_tv": "Nog geen tv toegevoegd - voeg er een toe op het tabblad \"Apparaatbeheer\"",
     "custom_samsungtv_apps_reload": "Opnieuw naar apps op de tv zoeken",
-    "custom_samsungtv_hint": "Klik in de afstandsbediening en gebruik de pijltjestoetsen, Enter, Backspace, + en - van het toetsenbord"
+    "custom_samsungtv_hint": "Klik in de afstandsbediening en gebruik de pijltjestoetsen, Enter, Backspace, + en - van het toetsenbord",
+    "custom_samsungtv_switch_on_first": "De tv is uit - zet hem aan met de aan/uit-toets om de andere toetsen te gebruiken",
+    "custom_samsungtv_steps_power": "Aan/uit",
+    "custom_samsungtv_steps_on": "Inschakelen en wachten",
+    "custom_samsungtv_steps_apps": "Apps",
+    "custom_samsungtv_steps_inputs": "Ingangen",
+    "custom_samsungtv_steps_keys": "Toetsen",
+    "custom_samsungtv_steps_pauses": "Pauzes",
+    "custom_samsungtv_steps_wait": "%s s wachten",
+    "custom_samsungtv_steps_add": "Stap toevoegen...",
+    "custom_samsungtv_steps_text": "Als tekst bewerken",
+    "custom_samsungtv_steps_list": "Met de lijst bewerken",
+    "custom_samsungtv_steps_unknown": "De adapter kent deze stap niet"
 }

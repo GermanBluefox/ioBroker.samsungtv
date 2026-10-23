@@ -73,7 +73,7 @@
     "Scan schedule": "Interwały skanowania i stanu",
     "Scanning": "Łów...",
     "Scenes": "Sceny",
-    "Scenes help": "Scena wysyła kilka klawiszy, aplikacji i wejść po kolei, np. HOME, YOUTUBE, WAIT 3000, OK. Kroki: klawisze (HOME, UP, SELECT lub OK, BACK, 1, VOLUP, KEY_...), aplikacje (YOUTUBE, NETFLIX, DISNEY_PLUS...), wejścia (TV, HDMI1, HDMI2...) i pauzy (WAIT 2000). Każda scena otrzymuje przycisk <TV>.scenes.<nazwa>.",
+    "Scenes help": "Scena wysyła kilka klawiszy, aplikacji i wejść po kolei, np. HOME, YOUTUBE, WAIT 3000, OK. Kroki: klawisze (HOME, UP, SELECT lub OK, BACK, 1, VOLUP, KEY_...), aplikacje (YOUTUBE, NETFLIX, DISNEY_PLUS...), wejścia (TV, HDMI1, HDMI2...) i pauzy (WAIT 2000). Każda scena otrzymuje przycisk <TV>.scenes.<nazwa>. Zacznij od ON, aby najpierw włączyć telewizor; bez tego scena działa tylko przy włączonym telewizorze.",
     "Seconds": "sekundy",
     "Send a test key?": "Wysłać klawisz testowy? Telewizor wyświetli wtedy pasek informacyjny.",
     "Set the volume": "Ustaw głośność",

@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "A instância não responde",
     "custom_samsungtv_no_tv": "Nenhuma TV adicionada - adicione uma na aba \"Gerenciamento de dispositivos\"",
     "custom_samsungtv_apps_reload": "Procurar apps na TV novamente",
-    "custom_samsungtv_hint": "Clique no controle remoto e use as setas, Enter, Backspace, + e - do teclado"
+    "custom_samsungtv_hint": "Clique no controle remoto e use as setas, Enter, Backspace, + e - do teclado",
+    "custom_samsungtv_switch_on_first": "A TV está desligada - ligue-a com a tecla de energia para usar as outras teclas",
+    "custom_samsungtv_steps_power": "Energia",
+    "custom_samsungtv_steps_on": "Ligar e aguardar",
+    "custom_samsungtv_steps_apps": "Apps",
+    "custom_samsungtv_steps_inputs": "Entradas",
+    "custom_samsungtv_steps_keys": "Teclas",
+    "custom_samsungtv_steps_pauses": "Pausas",
+    "custom_samsungtv_steps_wait": "Aguardar %s s",
+    "custom_samsungtv_steps_add": "Adicionar passo...",
+    "custom_samsungtv_steps_text": "Editar como texto",
+    "custom_samsungtv_steps_list": "Editar com a lista",
+    "custom_samsungtv_steps_unknown": "O adaptador não conhece este passo"
 }

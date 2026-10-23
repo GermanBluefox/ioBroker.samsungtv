@@ -31,5 +31,17 @@
     "custom_samsungtv_no_answer": "Экземпляр не отвечает",
     "custom_samsungtv_no_tv": "Телевизор ещё не добавлен - добавьте его на вкладке «Управление устройствами»",
     "custom_samsungtv_apps_reload": "Снова найти приложения на телевизоре",
-    "custom_samsungtv_hint": "Щёлкните по пульту и используйте стрелки, Enter, Backspace, + и - клавиатуры"
+    "custom_samsungtv_hint": "Щёлкните по пульту и используйте стрелки, Enter, Backspace, + и - клавиатуры",
+    "custom_samsungtv_switch_on_first": "Телевизор выключен - включите его кнопкой питания, чтобы пользоваться остальными кнопками",
+    "custom_samsungtv_steps_power": "Питание",
+    "custom_samsungtv_steps_on": "Включить и подождать",
+    "custom_samsungtv_steps_apps": "Приложения",
+    "custom_samsungtv_steps_inputs": "Входы",
+    "custom_samsungtv_steps_keys": "Кнопки",
+    "custom_samsungtv_steps_pauses": "Паузы",
+    "custom_samsungtv_steps_wait": "Ждать %s с",
+    "custom_samsungtv_steps_add": "Добавить шаг...",
+    "custom_samsungtv_steps_text": "Редактировать как текст",
+    "custom_samsungtv_steps_list": "Редактировать списком",
+    "custom_samsungtv_steps_unknown": "Адаптер не знает этот шаг"
 }

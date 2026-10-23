@@ -73,7 +73,7 @@
     "Scan schedule": "Intervalles d'analyse et d'état",
     "Scanning": "Balayage...",
     "Scenes": "Scènes",
-    "Scenes help": "Une scène envoie plusieurs touches, applications et entrées l'une après l'autre, par ex. HOME, YOUTUBE, WAIT 3000, OK. Étapes : touches (HOME, UP, SELECT ou OK, BACK, 1, VOLUP, KEY_...), applications (YOUTUBE, NETFLIX, DISNEY_PLUS...), entrées (TV, HDMI1, HDMI2...) et pauses (WAIT 2000). Chaque scène reçoit un bouton <TV>.scenes.<nom>.",
+    "Scenes help": "Une scène envoie plusieurs touches, applications et entrées l'une après l'autre, par ex. HOME, YOUTUBE, WAIT 3000, OK. Étapes : touches (HOME, UP, SELECT ou OK, BACK, 1, VOLUP, KEY_...), applications (YOUTUBE, NETFLIX, DISNEY_PLUS...), entrées (TV, HDMI1, HDMI2...) et pauses (WAIT 2000). Chaque scène reçoit un bouton <TV>.scenes.<nom>. Commencez par ON pour allumer d'abord le téléviseur ; sans cela, une scène ne s'exécute que lorsque le téléviseur est allumé.",
     "Seconds": "secondes",
     "Send a test key?": "Envoyer une touche de test ? Le téléviseur affiche alors son bandeau d'informations.",
     "Set the volume": "Régler le volume",
