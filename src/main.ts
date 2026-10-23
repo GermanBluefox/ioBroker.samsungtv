@@ -10,7 +10,6 @@ import os from 'node:os';
 import path from 'node:path';
 import { XMLParser } from 'fast-xml-parser';
 import WebSocket from 'ws';
-import wol from 'wake_on_lan';
 
 import { type DeviceManagementService, SamsungTvDeviceManagement } from './lib/SamsungTvDeviceManagement';
 import { SAMSUNG_APPS, findInstalledApps, launchAppRest } from './lib/apps';
@@ -25,6 +24,7 @@ import { boundedSeconds } from './lib/timerTools';
 import { parseScene, runScene, sceneDelay, sceneId, type SceneStep } from './lib/scenes';
 import { SOURCE_MENU_DELAY, SOURCE_MENU_KEY_GAP, parseSourceMenu, sourceMenuKeys } from './lib/sourceMenu';
 import { evaluateTizenTokenMessage } from './lib/tizenTokenTools';
+import { wakeOnLan } from './lib/wakeOnLan';
 import { TV_APPS, TV_INPUTS, TV_INPUT_KEYS, TV_KEYS, TV_KEY_CODES, statesOf } from './lib/tvValues';
 import {
     MASTER_CHANNEL_XML,
@@ -2036,7 +2036,7 @@ async function handleControl(
             return;
         case 'wol':
             if (adapter.config.enableWol && device.mac) {
-                wol.wake(device.mac);
+                sendWol(device);
                 await adapter.setStateAsync(id, false, true);
             }
             return;
@@ -2284,7 +2284,7 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
         }
         if (device.api === 'hj') {
             if (adapter.config.enableWol && device.mac) {
-                wol.wake(device.mac);
+                sendWol(device);
                 scheduleDevicePoll(device, 6000);
                 schedulePowerFallback(device, true, 'KEY_POWER', 8000);
                 return;
@@ -2310,7 +2310,7 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
             // the TV on within ~6 s, while KEY_POWER in standby once left the TV in deep standby. KEY_POWER
             // follows only if the TV is not on after 10 s.
             if (adapter.config.enableWol && device.mac) {
-                wol.wake(device.mac);
+                sendWol(device);
                 scheduleDevicePoll(device, 6000);
                 schedulePowerFallback(device, true, 'KEY_POWER', 10000);
                 return;
@@ -2326,7 +2326,13 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
             }
         }
         if (adapter.config.enableWol && device.mac) {
-            wol.wake(device.mac);
+            sendWol(device);
+        } else if (!status.online) {
+            adapter.log.warn(
+                `${device.name} does not answer and cannot be switched on: ${
+                    device.mac ? 'Wake-on-LAN is disabled in the settings' : 'its MAC address is unknown'
+                }`,
+            );
         }
         scheduleDevicePoll(device, 6000);
         return;
@@ -2361,6 +2367,15 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
         await sendKey(device, 'KEY_POWER');
         scheduleDevicePoll(device, 3000);
     }
+}
+
+/** Send the magic packet; logs where it went, never throws */
+function sendWol(device: RuntimeDevice): void {
+    wakeOnLan(device.mac)
+        .then(targets =>
+            adapter.log.info(`Wake-on-LAN for ${device.name} (${device.mac}) sent to ${targets.join(', ')}`),
+        )
+        .catch(e => adapter.log.warn(`Wake-on-LAN for ${device.name} failed: ${errorMessage(e)}`));
 }
 
 function schedulePowerFallback(device: RuntimeDevice, targetOn: boolean, fallbackKey: string, delayMs: number): void {

@@ -41,7 +41,6 @@
         "@iobroker/dm-utils": "^3.2.1",
         "bonjour-service": "^1.4.4",
         "fast-xml-parser": "^5.11.2",
-        "wake_on_lan": "^1.0.0",
         "ws": "^8.22.0"
     },
     "devDependencies": {

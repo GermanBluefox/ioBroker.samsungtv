@@ -178,6 +178,7 @@ Note: not every TV supports every key. Some keys only work when a menu/focus is 
 - (@GermanBluefox) Add a setup assistant after adding a TV and a remote control tab in the settings.
 - (@GermanBluefox) Control power, volume, mute, input, app and Art Mode from the Device Manager card; large cards.
 - (@GermanBluefox) Switch Tizen TVs on with Wake-on-LAN first; switch The Frame off instead of to Art Mode.
+- (@GermanBluefox) Send Wake-on-LAN to the broadcast address of every network interface, not only to 255.255.255.255, and log it.
 
 ### 0.0.28
 
