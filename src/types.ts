@@ -17,6 +17,30 @@ export interface ConfiguredDevice {
     renderingControlEventUrl?: string;
     tokenAuthSupport?: boolean;
     hjAvailable?: boolean;
+    /** The TV is a The Frame with Art Mode (`FrameTVSupport` of the REST API) */
+    frameTv?: boolean;
+    /** Order of the source menu after SmartThings, e.g. `['TV', 'HDMI2', 'USB']`; empty: direct input keys */
+    sourceMenu?: string[];
+    /** Apps found on the TV, `undefined` until the TV was asked */
+    apps?: InstalledApp[];
+}
+
+/** An app found on the TV */
+export interface InstalledApp {
+    /** Key of `TV_APPS`, e.g. `YOUTUBE` */
+    key: string;
+    /** The ID under which this TV knows it */
+    appId: string;
+}
+
+/** One row of the scene table */
+export interface SceneSetting {
+    name: string;
+    /** Object name of the TV; empty for all TVs */
+    device?: string;
+    steps: string;
+    /** Pause between two steps in ms */
+    delay?: number | string;
 }
 
 export interface AdapterNativeConfig {
@@ -31,6 +55,7 @@ export interface AdapterNativeConfig {
     enableMdns: boolean;
     enableWol: boolean;
     mdnsServices: string;
+    scenes?: SceneSetting[];
     migratedFromSamsung?: boolean;
 }
 
@@ -73,6 +98,9 @@ export interface RawConfiguredDevice {
     renderingControlEventUrl?: string;
     tokenAuthSupport?: boolean;
     hjAvailable?: boolean;
+    frameTv?: boolean;
+    sourceMenu?: string[];
+    apps?: InstalledApp[];
     [key: string]: unknown;
 }
 
@@ -95,6 +123,10 @@ export interface RuntimeDevice extends ConfiguredDevice {
     mutedShadowUntil?: number;
     powerTransition?: PowerTransition;
     _renderingControlLookupTs?: number;
+    /** Until when a running Art Mode switch owns `control.artMode`, see `setArtModeOf` */
+    artSwitchUntil?: number;
+    /** Apps are being looked up on the TV */
+    appLookupRunning?: boolean;
 }
 
 /** A TV found by SSDP or mDNS and probed */

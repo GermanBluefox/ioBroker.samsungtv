@@ -51,6 +51,11 @@ export interface DeviceManagementService<TDevice extends ManagedDevice = Managed
     confirmPin(device: TDevice, pin: string): Promise<unknown>;
     pairTizen(device: TDevice): Promise<unknown>;
     setTizenToken(device: TDevice, token: string): Promise<unknown>;
+    /** Order of the source menu after SmartThings, e.g. `['TV', 'HDMI2']`; empty for direct input keys */
+    getSourceMenu(device: TDevice): string[];
+    setSourceMenu(device: TDevice, menu: string): Promise<unknown>;
+    /** Send `KEY_INFO`, which shows a banner on the TV */
+    sendTestKey(device: TDevice): Promise<unknown>;
 }
 
 /** A text in all admin languages */
@@ -286,6 +291,21 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
                 handler: (id, context) => this.setToken(id, context),
             });
         }
+        // before rename and delete
+        actions.splice(actions.length - 2, 0, {
+            id: 'test',
+            icon: 'play',
+            description: t('Test connection'),
+            handler: (id, context) => this.test(id, context),
+        });
+        if (device.api === 'tizen' || device.api === 'unknown') {
+            actions.splice(actions.length - 2, 0, {
+                id: 'inputs',
+                icon: 'settings',
+                description: t('Inputs'),
+                handler: (id, context) => this.inputs(id, context),
+            });
+        }
         return {
             id: device.id,
             identifier: device.mac || device.uuid || device.id,
@@ -403,13 +423,15 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
         if (!data) {
             return { refresh: false };
         }
+        let added: TDevice;
         try {
-            await this.service.addDevice(data);
-            return { refresh: true };
+            added = (await this.service.addDevice(data)) as TDevice;
         } catch (error) {
             await context.showMessage(this.errorMessage('Add failed', error));
             return { refresh: false };
         }
+        await this.setUp(added.id, context);
+        return { refresh: true };
     }
 
     public async addDiscovered(id: string, context: ActionContext): Promise<DeviceRefreshResponse<string>> {
@@ -426,12 +448,103 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
         if (!data) {
             return { refresh: 'none' };
         }
+        let added: TDevice;
         try {
-            await this.service.addDevice({ ...device, ...data, id: device.id });
-            return { refresh: 'devices' };
+            added = (await this.service.addDevice({ ...device, ...data, id: device.id })) as TDevice;
         } catch (error) {
             await context.showMessage(this.errorMessage('Add failed', error));
             return { refresh: 'none' };
+        }
+        await this.setUp(added.id, context);
+        return { refresh: 'devices' };
+    }
+
+    /**
+     * The setup assistant after adding a TV: pair it, check that a key arrives, and ask for the order of
+     * the source menu. Every step can be skipped and is also available as an action of the TV.
+     */
+    public async setUp(id: string, context: ActionContext): Promise<void> {
+        let device = this.service.findDevice(id);
+        if (!device) {
+            return;
+        }
+        if (
+            (device.api === 'tizen' || device.api === 'hj' || device.api === 'unknown') &&
+            !this.service.isDevicePaired(device) &&
+            (await context.showConfirmation(t('Pair now?')))
+        ) {
+            if (!(await this.runPairing(device, context))) {
+                return;
+            }
+        }
+        // pairing may have changed the API from unknown to tizen
+        device = this.service.findDevice(id) || device;
+        if (await context.showConfirmation(t('Send a test key?'))) {
+            await this.runTest(device, context);
+        }
+        if (device.api === 'tizen' && (await context.showConfirmation(t('Set up the inputs now?')))) {
+            await this.runInputs(device, context);
+        }
+        await context.showMessage(t('Setup done'));
+    }
+
+    public async test(id: string, context: ActionContext): Promise<DeviceRefreshResponse<string>> {
+        const device = this.service.findDevice(id);
+        if (!device) {
+            await context.showMessage(t('Unknown device'));
+            return { refresh: 'devices' };
+        }
+        await this.runTest(device, context);
+        return { refresh: 'none' };
+    }
+
+    /** Send the test key and ask whether the TV reacted */
+    public async runTest(device: TDevice, context: ActionContext): Promise<void> {
+        try {
+            await this.service.sendTestKey(device);
+        } catch (error) {
+            await context.showMessage(this.errorMessage('Test failed', error));
+            return;
+        }
+        if (!(await context.showConfirmation(t('Test key sent')))) {
+            await context.showMessage(t('Test key not seen'));
+        }
+    }
+
+    public async inputs(id: string, context: ActionContext): Promise<DeviceRefreshResponse<string>> {
+        const device = this.service.findDevice(id);
+        if (!device) {
+            await context.showMessage(t('Unknown device'));
+            return { refresh: 'devices' };
+        }
+        await this.runInputs(device, context);
+        return { refresh: 'none' };
+    }
+
+    /** Ask for the order of the source menu */
+    public async runInputs(device: TDevice, context: ActionContext): Promise<void> {
+        const data = await context.showForm(
+            {
+                type: 'panel',
+                items: {
+                    _help: { type: 'staticText', text: tString('Source menu help'), xs: 12 },
+                    sourceMenu: {
+                        type: 'text',
+                        label: t('Source menu order'),
+                        default: this.service.getSourceMenu(device).join(', '),
+                        xs: 12,
+                    },
+                },
+            },
+            { title: t('Inputs'), buttons: ['cancel', 'apply'] },
+        );
+        if (!data) {
+            return;
+        }
+        try {
+            await this.service.setSourceMenu(device, String(data.sourceMenu ?? ''));
+        } catch (error) {
+            await context.showMessage(this.errorMessage('Save failed', error));
         }
     }
 
@@ -480,6 +593,12 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
             await context.showMessage(t('Unknown device'));
             return { refresh: 'devices' };
         }
+        await this.runPairing(device, context);
+        return { refresh: 'devices' };
+    }
+
+    /** Pair with the TV; `false` if it failed or was cancelled */
+    public async runPairing(device: TDevice, context: ActionContext): Promise<boolean> {
         try {
             if (device.api === 'hj') {
                 await this.service.requestPin(device);
@@ -499,17 +618,19 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
                     { title: t('Enter PIN'), buttons: ['cancel', 'apply'] },
                 );
                 if (!data) {
-                    return { refresh: 'none' };
+                    return false;
                 }
                 await this.service.confirmPin(device, String(data.pin));
             } else {
+                // the TV asks only while the connection waits, so tell the user before
+                await context.showMessage(t('Allow on the TV'));
                 await this.service.pairTizen(device);
             }
             await context.showMessage(t('Paired'));
-            return { refresh: 'devices' };
+            return true;
         } catch (error) {
             await context.showMessage(this.errorMessage('Pairing failed', error));
-            return { refresh: 'devices' };
+            return false;
         }
     }
 

@@ -27,7 +27,7 @@ function createManager(service: Record<string, unknown> = {}): SamsungTvDeviceMa
     return manager;
 }
 
-function createContext(formResult?: Record<string, unknown>): TestContext {
+function createContext(formResult?: Record<string, unknown>, confirmations: boolean[] = []): TestContext {
     const messages: Record<string, string>[] = [];
     const devices: DeviceInfo<string>[] = [];
     const totals: number[] = [];
@@ -50,6 +50,11 @@ function createContext(formResult?: Record<string, unknown>): TestContext {
         },
         async showForm() {
             return formResult;
+        },
+        // answers the questions in order, "no" once the list is used up
+        async showConfirmation(message: ioBroker.StringOrTranslated) {
+            messages.push(message as Record<string, string>);
+            return confirmations.shift() ?? false;
         },
         async openProgress() {
             return {
@@ -106,8 +111,10 @@ describe('Samsung TV device management', () => {
         let added: Record<string, unknown> | undefined;
         const manager = createManager({
             addDevice: async (device: Record<string, unknown>) => {
-                added = device;
+                added = { ...device, id: 'bedroom-id' };
+                return added;
             },
+            findDevice: () => added,
         });
         const context = createContext({ name: 'Bedroom', ip: '192.0.2.12', api: 'tizen', protocol: 'wss' });
 
@@ -115,6 +122,57 @@ describe('Samsung TV device management', () => {
 
         assert.deepEqual(result, { refresh: true });
         assert.equal(added?.name, 'Bedroom');
+        // the setup assistant asks for every step; all of them skipped here
+        assert.deepEqual(
+            context.messages.map(message => message.en),
+            [t('Pair now?').en, t('Send a test key?').en, t('Set up the inputs now?').en, t('Setup done').en],
+        );
+    });
+
+    it('pairs, tests and sets up the inputs with the setup assistant', async () => {
+        const calls: unknown[][] = [];
+        const device = { id: 'tizen-new', name: 'kitchen', ip: '192.0.2.20', api: 'tizen' };
+        const manager = createManager({
+            findDevice: () => device,
+            pairTizen: async (value: ManagedDevice) => calls.push(['pair', value.id]),
+            sendTestKey: async (value: ManagedDevice) => calls.push(['test', value.id]),
+            getSourceMenu: () => [],
+            setSourceMenu: async (value: ManagedDevice, menu: string) => calls.push(['inputs', value.id, menu]),
+        });
+        // pair: yes, test key: yes, seen on the TV: yes, inputs: yes
+        const context = createContext({ sourceMenu: 'TV, HDMI2' }, [true, true, true, true]);
+
+        await manager.setUp(device.id, context);
+
+        assert.deepEqual(calls, [
+            ['pair', 'tizen-new'],
+            ['test', 'tizen-new'],
+            ['inputs', 'tizen-new', 'TV, HDMI2'],
+        ]);
+        const texts = context.messages.map(message => message.en);
+        // the hint comes before the TV asks
+        assert.ok(texts.indexOf(t('Allow on the TV').en) < texts.indexOf(t('Paired').en));
+        assert.equal(texts.at(-1), t('Setup done').en);
+    });
+
+    it('stops the setup assistant when pairing fails', async () => {
+        const device = { id: 'tizen-new', name: 'kitchen', ip: '192.0.2.20', api: 'tizen' };
+        let tested = false;
+        const manager = createManager({
+            findDevice: () => device,
+            pairTizen: async () => {
+                throw new Error('Pairing timeout');
+            },
+            sendTestKey: async () => {
+                tested = true;
+            },
+        });
+        const context = createContext(undefined, [true, true, true]);
+
+        await manager.setUp(device.id, context);
+
+        assert.equal(tested, false);
+        assert.equal(context.messages.at(-1)?.en, `${t('Pairing failed').en}: Pairing timeout`);
     });
 
     it('runs the H/J PIN pairing sequence without exposing the PIN in messages', async () => {
@@ -173,7 +231,7 @@ describe('Samsung TV device management', () => {
         assert.deepEqual(result, { refresh: 'devices' });
         assert.equal(JSON.stringify(context.messages).includes('12345678'), false);
         const actions = manager.configuredDeviceInfo(device).actions?.map(action => action.id);
-        assert.deepEqual(actions, ['pair', 'set-token', 'rename', 'delete']);
+        assert.deepEqual(actions, ['pair', 'set-token', 'test', 'inputs', 'rename', 'delete']);
         const hjActions = manager.configuredDeviceInfo({ ...device, api: 'hj' }).actions?.map(action => action.id);
         assert.equal(hjActions?.includes('set-token'), false);
     });

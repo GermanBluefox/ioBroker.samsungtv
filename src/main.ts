@@ -13,6 +13,8 @@ import WebSocket from 'ws';
 import wol from 'wake_on_lan';
 
 import { type DeviceManagementService, SamsungTvDeviceManagement } from './lib/SamsungTvDeviceManagement';
+import { SAMSUNG_APPS, findInstalledApps, launchAppRest } from './lib/apps';
+import { artChannelUrl, getArtMode, setArtMode } from './lib/artMode';
 import { SsdpClient } from './lib/discovery/SsdpClient';
 import { SamsungTv as SamsungHJ } from './lib/hj/SamsungTv';
 import { LegacyRemote } from './lib/legacy/LegacyRemote';
@@ -20,7 +22,10 @@ import { shouldMigrateLegacySamsung } from './lib/legacyMigrationTools';
 import { getPingArguments, normalizeMac, parseArpTable, parseMacFromArpOutput } from './lib/networkTools';
 import { acceptPowerUpdate, startPowerTransition } from './lib/powerTransitionTools';
 import { boundedSeconds } from './lib/timerTools';
+import { parseScene, runScene, sceneDelay, sceneId, type SceneStep } from './lib/scenes';
+import { SOURCE_MENU_DELAY, SOURCE_MENU_KEY_GAP, parseSourceMenu, sourceMenuKeys } from './lib/sourceMenu';
 import { evaluateTizenTokenMessage } from './lib/tizenTokenTools';
+import { TV_APPS, TV_INPUTS, TV_INPUT_KEYS, TV_KEYS, TV_KEY_CODES, statesOf } from './lib/tvValues';
 import {
     MASTER_CHANNEL_XML,
     RENDERING_CONTROL_LOOKUP_TTL,
@@ -38,6 +43,7 @@ import type {
     DeviceStatus,
     DiscoveredDevice,
     HjIdentity,
+    InstalledApp,
     RawConfiguredDevice,
     RuntimeDevice,
     TokenStore,
@@ -158,6 +164,7 @@ function createAdapter(options: Partial<utils.AdapterOptions> = {}): utils.Adapt
         name: 'samsungtv',
         ready: main,
         stateChange: onStateChange,
+        message: onMessage,
         unload: onUnload,
     });
     return adapter;
@@ -455,6 +462,9 @@ function getConfiguredDevices(): RuntimeDevice[] {
             renderingControlEventUrl: raw.renderingControlEventUrl || '',
             tokenAuthSupport: typeof raw.tokenAuthSupport === 'boolean' ? raw.tokenAuthSupport : undefined,
             hjAvailable: typeof raw.hjAvailable === 'boolean' ? raw.hjAvailable : undefined,
+            frameTv: raw.frameTv === true,
+            sourceMenu: Array.isArray(raw.sourceMenu) ? raw.sourceMenu.map(String) : [],
+            apps: Array.isArray(raw.apps) ? raw.apps : undefined,
         };
         result.push(device);
     }
@@ -649,7 +659,24 @@ function createDeviceManagementService(): DeviceManagementService<AnyDevice> {
         confirmPin: confirmManagedHjPin,
         pairTizen: pairManagedTizen,
         setTizenToken: setManagedTizenToken,
+        getSourceMenu: device => devicesById.get(device.id)?.sourceMenu || [],
+        setSourceMenu: async (device, menu) => {
+            const configured = configuredDeviceOf(device);
+            updateRegistryDevice(configured, { sourceMenu: parseSourceMenu(menu) });
+            await persistRegistry();
+            await ensureDeviceObjects(configured);
+        },
+        sendTestKey: device => sendKey(configuredDeviceOf(device), 'KEY_INFO'),
     };
+}
+
+/** The configured TV behind a device of the Device Manager */
+function configuredDeviceOf(device: AnyDevice): RuntimeDevice {
+    const configured = devicesById.get(device.id);
+    if (!configured) {
+        throw new Error('Unknown device');
+    }
+    return configured;
 }
 
 function scheduleRegistrySave(): void {
@@ -962,18 +989,93 @@ async function ensureDeviceObjects(device: RuntimeDevice): Promise<void> {
     await removeStateIfExists(`${base}.state.app`);
     await removeStateIfExists(`${base}.state.source`);
 
+    // The control channel is a `tv` of the type-detector: switch.power and media.key are required, the
+    // fixed values of media.key, media.app and media.input are listed in common.states. key, launchApp
+    // and source keep accepting Samsung codes (KEY_HOME, app IDs) as before.
     await ensureState(`${base}.control.power`, 'Power', 'boolean', 'switch.power', false, false);
     await ensureState(`${base}.control.wol`, 'Wake', 'boolean', 'button', false, false);
-    await ensureState(`${base}.control.key`, 'Key', 'string', 'text', '', false);
-    await ensureState(`${base}.control.volumeUp`, 'Volume Up', 'boolean', 'button', false, false);
-    await ensureState(`${base}.control.volumeDown`, 'Volume Down', 'boolean', 'button', false, false);
+    await ensureState(`${base}.control.key`, 'Key', 'string', 'media.key', '', false, { states: { ...TV_KEYS } });
+    await ensureState(`${base}.control.volumeUp`, 'Volume Up', 'boolean', 'button.volume.up', false, false);
+    await ensureState(`${base}.control.volumeDown`, 'Volume Down', 'boolean', 'button.volume.down', false, false);
     await ensureState(`${base}.control.mute`, 'Mute', 'boolean', 'button', false, false);
     await ensureState(`${base}.control.channelUp`, 'Channel Up', 'boolean', 'button', false, false);
     await ensureState(`${base}.control.channelDown`, 'Channel Down', 'boolean', 'button', false, false);
-    await ensureState(`${base}.control.launchApp`, 'Launch App', 'string', 'text', '', false);
-    await ensureState(`${base}.control.source`, 'Source', 'string', 'text', '', false);
-    await ensureState(`${base}.control.volume`, 'Volume', 'number', 'level.volume', 0, false);
+    await ensureState(`${base}.control.launchApp`, 'Launch App', 'string', 'media.app', '', false, {
+        states: appStatesOf(device),
+    });
+    await ensureState(`${base}.control.source`, 'Source', 'string', 'media.input', '', false, {
+        states: inputStatesOf(device),
+    });
+    await ensureState(`${base}.control.volume`, 'Volume', 'number', 'level.volume', 0, false, {
+        min: 0,
+        max: 100,
+        unit: '%',
+    });
     await ensureState(`${base}.control.muted`, 'Muted', 'boolean', 'media.mute', false, false);
+    if (device.frameTv) {
+        await ensureState(`${base}.control.artMode`, 'Art Mode', 'boolean', 'switch.mode.art', false, false);
+    } else {
+        await removeStateIfExists(`${base}.control.artMode`);
+    }
+    await ensureSceneStates(device);
+}
+
+/** The apps of `media.app`: those found on the TV, all known ones until the TV was asked */
+function appStatesOf(device: RuntimeDevice): Record<string, string> {
+    if (device.api !== 'tizen' && device.api !== 'unknown') {
+        return {};
+    }
+    return statesOf(TV_APPS, device.apps ? device.apps.map(app => app.key) : Object.keys(SAMSUNG_APPS));
+}
+
+/** The inputs of `media.input`: those of the configured source menu, otherwise those with a direct key */
+function inputStatesOf(device: RuntimeDevice): Record<string, string> {
+    const menu = device.sourceMenu || [];
+    return statesOf(TV_INPUTS, menu.length ? menu : Object.keys(TV_INPUT_KEYS));
+}
+
+/** The scenes of the settings that belong to this TV, keyed by their state ID */
+function scenesOf(device: RuntimeDevice): Map<string, { name: string; steps: SceneStep[]; delay: number }> {
+    const scenes = new Map<string, { name: string; steps: SceneStep[]; delay: number }>();
+    for (const scene of Array.isArray(adapter.config.scenes) ? adapter.config.scenes : []) {
+        const id = sceneId(scene?.name);
+        if (!id || (scene.device && scene.device !== device.name)) {
+            continue;
+        }
+        try {
+            scenes.set(id, { name: scene.name.trim(), steps: parseScene(scene.steps), delay: sceneDelay(scene.delay) });
+        } catch (e) {
+            adapter.log.warn(`Scene "${scene.name}" ignored: ${errorMessage(e)}`);
+        }
+    }
+    return scenes;
+}
+
+/** One button per scene in `<tv>.scenes`; buttons of removed scenes are deleted */
+async function ensureSceneStates(device: RuntimeDevice): Promise<void> {
+    const scenes = scenesOf(device);
+    const channel = `${device.name}.scenes`;
+    const existing = await adapter.getObjectViewAsync('system', 'state', {
+        startkey: `${adapter.namespace}.${channel}.`,
+        endkey: `${adapter.namespace}.${channel}.香`,
+    });
+    for (const row of existing.rows) {
+        if (!scenes.has(row.id.split('.').pop()!)) {
+            await removeStateIfExists(row.id.slice(adapter.namespace.length + 1));
+        }
+    }
+    if (!scenes.size) {
+        try {
+            await adapter.delObjectAsync(channel);
+        } catch {
+            // not there
+        }
+        return;
+    }
+    await adapter.setObjectNotExistsAsync(channel, { type: 'channel', common: { name: 'Scenes' }, native: {} });
+    for (const [id, scene] of scenes) {
+        await ensureState(`${channel}.${id}`, scene.name, 'boolean', 'button', false, false);
+    }
 }
 
 async function ensureState(
@@ -983,6 +1085,7 @@ async function ensureState(
     role: string,
     def: ioBroker.StateValue | undefined,
     readOnly: boolean,
+    extra: Partial<ioBroker.StateCommon> = {},
 ): Promise<void> {
     const common: ioBroker.StateCommon = {
         name,
@@ -991,6 +1094,7 @@ async function ensureState(
         read: !role.startsWith('button'),
         write: !readOnly,
         def,
+        ...extra,
     };
     await adapter.setObjectNotExistsAsync(id, {
         type: 'state',
@@ -999,6 +1103,14 @@ async function ensureState(
     });
     // Keep adapter-owned metadata current when roles evolve between versions.
     await adapter.extendObjectAsync(id, { common });
+    if (extra.states) {
+        // extendObject merges `states`, so values that are gone (an uninstalled app) would stay
+        const obj = await adapter.getObjectAsync(id);
+        if (obj && JSON.stringify(obj.common.states) !== JSON.stringify(extra.states)) {
+            obj.common.states = extra.states;
+            await adapter.setObjectAsync(id, obj);
+        }
+    }
     if (def !== undefined) {
         const existing = await adapter.getStateAsync(id);
         if (existing === null || existing === undefined) {
@@ -1037,6 +1149,7 @@ async function main(): Promise<void> {
     await reloadConfiguredDevices();
 
     adapter.subscribeStates('*.control.*');
+    adapter.subscribeStates('*.scenes.*');
 
     pollIntervalMs = boundedSeconds(adapter.config.pollInterval, 30, 10, MAX_POLL_INTERVAL_SECONDS) * 1000;
     await pollDevices();
@@ -1140,9 +1253,104 @@ async function pollDevice(device: RuntimeDevice): Promise<void> {
                 adapter.log.debug(`UPnP subscribe failed for ${device.name}: ${errorMessage(e)}`),
             );
         }
+        await pollArtMode(device, status.online && status.power);
+        if (status.online && status.power && device.api === 'tizen' && !device.apps) {
+            lookUpApps(device).catch(e =>
+                adapter.log.debug(`App lookup failed for ${device.name}: ${errorMessage(e)}`),
+            );
+        }
     } catch {
         // ignore
     }
+}
+
+/** The token for a websocket channel of a Tizen TV, empty if it needs none */
+function tizenTokenOf(device: RuntimeDevice): string {
+    const token = getTizenTokenRaw(device.id);
+    return token === NO_TOKEN ? '' : token || '';
+}
+
+/** Read the Art Mode of a The Frame into `control.artMode`; off while the TV is off */
+async function pollArtMode(device: RuntimeDevice, on: boolean): Promise<void> {
+    if (!device.frameTv || (device.artSwitchUntil && Date.now() < device.artSwitchUntil)) {
+        return;
+    }
+    let artMode = false;
+    if (on) {
+        try {
+            artMode = await getArtMode(artChannelUrl(device.ip, tizenTokenOf(device)));
+        } catch (e) {
+            adapter.log.debug(`Art Mode of ${device.name} not readable: ${errorMessage(e)}`);
+            return;
+        }
+    }
+    await adapter.setStateAsync(`${device.name}.control.artMode`, artMode, true);
+}
+
+/** Switch the Art Mode; the poll leaves `control.artMode` alone meanwhile, the TV reports the old value */
+async function setArtModeOf(device: RuntimeDevice, on: boolean): Promise<void> {
+    if (!device.frameTv) {
+        throw new Error(`${device.name} has no Art Mode`);
+    }
+    const url = artChannelUrl(device.ip, tizenTokenOf(device));
+    device.artSwitchUntil = Date.now() + 15000;
+    try {
+        // the TV reports no art_mode_changed if nothing changes
+        if ((await getArtMode(url)) !== on) {
+            await setArtMode(url, on);
+        }
+    } finally {
+        device.artSwitchUntil = 0;
+    }
+    await adapter.setStateAsync(`${device.name}.control.artMode`, on, true);
+    adapter.log.debug(`Art Mode of ${device.name} ${on ? 'on' : 'off'}`);
+}
+
+/** Note whether the TV is a The Frame; the Art Mode state is created or removed accordingly */
+async function applyFrameTvSupport(device: RuntimeDevice, info: unknown): Promise<void> {
+    const value = asObject(asObject(info).device).FrameTVSupport;
+    if (value === undefined) {
+        return;
+    }
+    const frameTv = value === true || value === 'true';
+    if (frameTv !== device.frameTv) {
+        updateRegistryDevice(device, { frameTv });
+        await ensureDeviceObjects(device);
+    }
+}
+
+/** Ask the TV which of the known apps are installed and offer those in `control.launchApp` */
+async function lookUpApps(device: RuntimeDevice): Promise<InstalledApp[]> {
+    if (device.appLookupRunning) {
+        return device.apps || [];
+    }
+    device.appLookupRunning = true;
+    try {
+        const apps = await findInstalledApps(device.ip);
+        if (!apps) {
+            throw new Error('The TV does not answer. Is it switched on?');
+        }
+        adapter.log.debug(`Apps found on ${device.name}: ${apps.map(app => app.key).join(', ') || '-'}`);
+        updateRegistryDevice(device, { apps });
+        await ensureDeviceObjects(device);
+        return apps;
+    } finally {
+        device.appLookupRunning = false;
+    }
+}
+
+/** Store settings and findings of a TV in its registry entry */
+function updateRegistryDevice(
+    device: RuntimeDevice,
+    patch: Pick<RawConfiguredDevice, 'frameTv' | 'sourceMenu' | 'apps'>,
+): void {
+    for (const raw of configuredDevicesRaw) {
+        if (configuredDeviceMatches(raw, device.id)) {
+            Object.assign(raw, patch);
+        }
+    }
+    Object.assign(device, patch);
+    scheduleRegistrySave();
 }
 
 function resolveAudioStates(
@@ -1439,6 +1647,7 @@ async function checkDeviceStatusWithIp(device: RuntimeDevice): Promise<DeviceSta
                 muted: null,
             };
             applyAudioFieldsFromInfo(info, status);
+            await applyFrameTvSupport(device, info);
             if (!device.mac) {
                 const mac = macFromTizenInfo(info);
                 if (mac) {
@@ -1463,6 +1672,7 @@ async function checkDeviceStatusWithIp(device: RuntimeDevice): Promise<DeviceSta
                 muted: null,
             };
             applyAudioFieldsFromInfo(info2, status);
+            await applyFrameTvSupport(device, info2);
             if (!device.mac) {
                 const mac = macFromTizenInfo(info2);
                 if (mac) {
@@ -1547,7 +1757,7 @@ function onStateChange(id: string, state: ioBroker.State | null | undefined): vo
     const channel = parts[3];
     const command = parts[4] as string;
 
-    if (channel !== 'control') {
+    if (channel !== 'control' && channel !== 'scenes') {
         return;
     }
 
@@ -1557,9 +1767,122 @@ function onStateChange(id: string, state: ioBroker.State | null | undefined): vo
         return;
     }
 
+    if (channel === 'scenes') {
+        if (isTruthyValue(state.val)) {
+            runSceneOf(device, command)
+                .then(() => adapter.setStateAsync(id, false, true))
+                .catch(e => adapter.log.warn(`Scene ${command} of ${device.name} failed: ${errorMessage(e)}`));
+        }
+        return;
+    }
+
     handleControl(device, id, command, state.val).catch(e => {
         adapter.log.warn(`Failed to execute ${command} for ${device.name}: ${errorMessage(e)}`);
     });
+}
+
+/**
+ * Commands of the admin pages (remote control tab, scene table). Answers `{ error }` on failure; never with
+ * `result`, which admin would show in an alert. `dm:` commands belong to the Device Manager.
+ */
+function onMessage(obj: ioBroker.Message): void {
+    if (!obj?.callback || !obj.command || obj.command.startsWith('dm:')) {
+        return;
+    }
+    void handleMessage(obj.command, asObject(obj.message))
+        .catch(e => ({ error: errorMessage(e) }))
+        .then(response => adapter.sendTo(obj.from, obj.command, response, obj.callback));
+}
+
+async function handleMessage(command: string, message: JsonObject): Promise<unknown> {
+    if (command === 'listDevices') {
+        // options of a selectSendTo
+        const options = Array.from(devicesById.values()).map(device => ({
+            label: device.displayName || device.name,
+            value: device.name,
+        }));
+        return message.withAll ? [{ label: 'All TVs', value: '' }, ...options] : options;
+    }
+    if (command === 'devices') {
+        return {
+            devices: Array.from(devicesById.values()).map(device => ({
+                name: device.name,
+                displayName: device.displayName || device.name,
+                api: device.api,
+                frameTv: !!device.frameTv,
+                apps: Object.keys(appStatesOf(device)),
+                inputs: Object.keys(inputStatesOf(device)),
+                scenes: Array.from(scenesOf(device)).map(([id, scene]) => ({ id, name: scene.name })),
+            })),
+        };
+    }
+
+    const device = devicesByName.get(asString(message.device));
+    if (!device) {
+        return { error: `Unknown TV ${asString(message.device)}` };
+    }
+    switch (command) {
+        case 'remote': {
+            const key = normalizeKeyInput(message.key);
+            if (!key) {
+                return { error: `Unknown key ${asString(message.key)}` };
+            }
+            await sendKey(device, key);
+            return {};
+        }
+        case 'launchApp':
+            await launchAppOf(device, asString(message.app));
+            return {};
+        case 'input':
+            await selectSource(device, asString(message.input));
+            return {};
+        case 'apps':
+            if (message.refresh) {
+                await lookUpApps(device);
+            }
+            return { apps: Object.keys(appStatesOf(device)) };
+        case 'runScene':
+            await runSceneOf(device, asString(message.scene));
+            return {};
+        case 'power':
+            await handleControl(device, `${device.name}.control.power`, 'power', !!message.on);
+            return {};
+        case 'artMode':
+            await setArtModeOf(device, !!message.on);
+            return {};
+        default:
+            return { error: `Unknown command ${command}` };
+    }
+}
+
+/** Scenes that are running, per TV, so that a second press does not interleave the keys */
+const runningScenes = new Set<string>();
+
+/** Run a scene of the settings on a TV */
+async function runSceneOf(device: RuntimeDevice, id: string): Promise<void> {
+    const scene = scenesOf(device).get(id);
+    if (!scene) {
+        throw new Error(`Unknown scene ${id}`);
+    }
+    if (runningScenes.has(device.id)) {
+        throw new Error('Another scene is still running on this TV');
+    }
+    runningScenes.add(device.id);
+    try {
+        adapter.log.debug(`Scene ${scene.name} on ${device.name}: ${scene.steps.length} steps`);
+        await runScene(scene.steps, scene.delay, {
+            sendKey: key => sendKey(device, key),
+            launchApp: app => launchAppOf(device, app),
+            selectInput: input => selectSource(device, input),
+            sleep,
+        });
+    } finally {
+        runningScenes.delete(device.id);
+    }
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => adapter.setTimeout(resolve, ms));
 }
 
 async function handleControl(
@@ -1614,7 +1937,7 @@ async function handleControl(
             return sendButton(device, id, 'KEY_CHDOWN', value);
         case 'launchApp':
             if (typeof value === 'string' && value.trim()) {
-                await launchApp(device, value.trim());
+                await launchAppOf(device, value.trim());
                 await adapter.setStateAsync(id, '', true);
             }
             return;
@@ -1624,6 +1947,8 @@ async function handleControl(
                 await adapter.setStateAsync(id, '', true);
             }
             return;
+        case 'artMode':
+            return setArtModeOf(device, isTruthyValue(value));
         default:
             return;
     }
@@ -1754,6 +2079,11 @@ function normalizeKeyInput(input: unknown): string {
     const upper = raw.toUpperCase();
     if (upper.startsWith('KEY_')) {
         return upper;
+    }
+    // the keys of TV_KEYS, e.g. SELECT, CHANNEL_UP, NUMBER_5
+    const code = TV_KEY_CODES[upper.replace(/\s+/g, '_')];
+    if (code) {
+        return code;
     }
 
     const normalized = raw.toLowerCase().replace(/\s+/g, '');
@@ -2048,9 +2378,80 @@ async function launchApp(device: RuntimeDevice, appId: string): Promise<void> {
     markSeen(device);
 }
 
+/**
+ * Start an app: a key of `TV_APPS` (`YOUTUBE`) or an app ID of the TV. Over the REST API first - the
+ * websocket launch does nothing on newer TVs (The Frame 2022) - and over the websocket if REST fails.
+ */
+async function launchAppOf(device: RuntimeDevice, app: string): Promise<void> {
+    if (device.api !== 'tizen') {
+        adapter.log.warn(`launchApp only supported for Tizen devices (${device.name})`);
+        return;
+    }
+    const key = app.toUpperCase();
+    let appIds = [app];
+    if (TV_APPS[key]) {
+        const found = device.apps?.find(entry => entry.key === key);
+        appIds = found ? [found.appId] : SAMSUNG_APPS[key]?.ids || [];
+        if (!appIds.length) {
+            throw new Error(`No app ID of ${TV_APPS[key]} is known`);
+        }
+        if (device.apps && !found) {
+            throw new Error(`${TV_APPS[key]} is not installed on ${device.name}`);
+        }
+    }
+    let restError: unknown;
+    for (const appId of appIds) {
+        try {
+            await launchAppRest(device.ip, appId);
+            markSeen(device);
+            return;
+        } catch (e) {
+            restError = e;
+        }
+    }
+    adapter.log.debug(`REST app launch failed on ${device.name} (${errorMessage(restError)}), trying the websocket`);
+    await launchApp(device, appIds[0]!);
+}
+
+/**
+ * Switch the input: a key of `TV_INPUTS` (`HDMI2`) or a Samsung key code. With a configured source menu
+ * over the menu, otherwise with the direct key (`KEY_HDMI2`), which newer TVs ignore.
+ */
 async function selectSource(device: RuntimeDevice, source: string): Promise<void> {
-    const sourceKey = source.toUpperCase().startsWith('KEY_') ? source.toUpperCase() : `KEY_${source.toUpperCase()}`;
-    await sendKey(device, sourceKey);
+    const name = source.toUpperCase().replace(/\s+/g, '');
+    const menuKeys = name.startsWith('KEY_') ? null : sourceMenuKeys(device.sourceMenu || [], name);
+    if (menuKeys) {
+        await sendKey(device, 'KEY_SOURCE');
+        await sleep(SOURCE_MENU_DELAY);
+        await sendKeys(device, menuKeys, SOURCE_MENU_KEY_GAP);
+        return;
+    }
+    if (device.sourceMenu?.length && TV_INPUTS[name]) {
+        throw new Error(`${TV_INPUTS[name]} is not in the source menu of ${device.name}`);
+    }
+    await sendKey(device, name.startsWith('KEY_') ? name : TV_INPUT_KEYS[name] || `KEY_${name}`);
+}
+
+/** Send several keys with a pause in between; a Tizen TV gets them over one connection */
+async function sendKeys(device: RuntimeDevice, keys: string[], gap: number): Promise<void> {
+    if (device.api === 'tizen') {
+        await tizenSend(
+            device,
+            keys.map(key => ({
+                method: 'ms.remote.control',
+                params: { Cmd: 'Click', DataOfCmd: key, Option: 'false', TypeOfRemote: 'SendRemoteKey' },
+            })),
+            gap,
+        );
+        markSeen(device);
+        return;
+    }
+    for (const [i, key] of keys.entries()) {
+        if (i) {
+            await sleep(gap);
+        }
+        await sendKey(device, key);
+    }
 }
 
 async function tizenSendKey(device: RuntimeDevice, key: string): Promise<void> {
@@ -2072,7 +2473,8 @@ async function tizenSendKey(device: RuntimeDevice, key: string): Promise<void> {
     }
 }
 
-async function tizenSend(device: RuntimeDevice, payload: JsonObject): Promise<void> {
+/** Send one or several messages over one connection, `gap` ms apart */
+async function tizenSend(device: RuntimeDevice, payload: JsonObject | JsonObject[], gap?: number): Promise<void> {
     const tokenRaw = getTizenTokenRaw(device.id);
     const token = tokenRaw === NO_TOKEN ? '' : tokenRaw;
     if (device.tokenAuthSupport === true && !token) {
@@ -2082,7 +2484,7 @@ async function tizenSend(device: RuntimeDevice, payload: JsonObject): Promise<vo
     let lastError: Error | undefined;
     for (const url of urlCandidates) {
         try {
-            await tizenWsRequest(url, payload);
+            await tizenWsRequest(url, payload, gap);
             return;
         } catch (e) {
             lastError = e as Error;
@@ -2139,14 +2541,22 @@ interface TizenWsMessage {
     data?: { message?: string; token?: string; data?: { token?: string } };
 }
 
-async function tizenWsRequest(url: string, payload: JsonObject): Promise<void> {
+async function tizenWsRequest(
+    url: string,
+    payload: JsonObject | JsonObject[],
+    gap: number = WS_SEND_DELAY,
+): Promise<void> {
+    const payloads = Array.isArray(payload) ? payload : [payload];
     return new Promise((resolve, reject) => {
         const safeUrl = url.replace(/token=[^&]+/i, 'token=***');
         const ws = new WebSocket(url, buildTizenWsOptions(url));
-        const timeout = adapter.setTimeout(() => {
-            ws.terminate();
-            reject(new Error('WebSocket timeout'));
-        }, WS_CONNECT_TIMEOUT);
+        const timeout = adapter.setTimeout(
+            () => {
+                ws.terminate();
+                reject(new Error('WebSocket timeout'));
+            },
+            WS_CONNECT_TIMEOUT + payloads.length * gap,
+        );
 
         ws.on('error', err => {
             adapter.clearTimeout(timeout);
@@ -2175,20 +2585,25 @@ async function tizenWsRequest(url: string, payload: JsonObject): Promise<void> {
             }
             if ((message.event === 'ms.channel.connect' || message.event === 'ms.channel.ready') && !sent) {
                 sent = true;
-                adapter.setTimeout(() => {
+                const sendNext = (index: number): void => {
                     try {
-                        ws.send(JSON.stringify(payload));
+                        ws.send(JSON.stringify(payloads[index]));
                     } catch (e) {
                         adapter.clearTimeout(timeout);
                         ws.close();
                         return reject(e instanceof Error ? e : new Error(String(e)));
+                    }
+                    if (index + 1 < payloads.length) {
+                        adapter.setTimeout(() => sendNext(index + 1), gap);
+                        return;
                     }
                     adapter.setTimeout(() => {
                         adapter.clearTimeout(timeout);
                         ws.close();
                         resolve();
                     }, WS_SEND_DELAY);
-                }, WS_SEND_DELAY);
+                };
+                adapter.setTimeout(() => sendNext(0), WS_SEND_DELAY);
             }
         });
 
