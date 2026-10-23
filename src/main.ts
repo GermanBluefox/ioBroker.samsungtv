@@ -667,6 +667,17 @@ function createDeviceManagementService(): DeviceManagementService<AnyDevice> {
             await ensureDeviceObjects(configured);
         },
         sendTestKey: device => sendKey(configuredDeviceOf(device), 'KEY_INFO'),
+        getCapabilities: device => {
+            const configured = devicesById.get(device.id);
+            return configured
+                ? { inputs: inputStatesOf(configured), apps: appStatesOf(configured), artMode: !!configured.frameTv }
+                : { inputs: {}, apps: {}, artMode: false };
+        },
+        control: async (device, control, value) => {
+            const configured = configuredDeviceOf(device);
+            const value_ = value === null ? '' : value;
+            await handleControl(configured, `${configured.name}.control.${control}`, control, value_);
+        },
     };
 }
 

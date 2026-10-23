@@ -7,7 +7,9 @@ import {
     type ConfigItemPanel,
     type ConfigItemSelect,
     type ConfigItemText,
+    type ControlState,
     type DeviceAction,
+    type DeviceControl,
     type DeviceDetails,
     type DeviceInfo,
     type DeviceLoadContext,
@@ -56,6 +58,19 @@ export interface DeviceManagementService<TDevice extends ManagedDevice = Managed
     setSourceMenu(device: TDevice, menu: string): Promise<unknown>;
     /** Send `KEY_INFO`, which shows a banner on the TV */
     sendTestKey(device: TDevice): Promise<unknown>;
+    /** What the TV offers to control: inputs and apps as `common.states`, whether it has Art Mode */
+    getCapabilities(device: TDevice): TvCapabilities;
+    /** Execute a control of the device card: `power`, `volume`, `muted`, `source`, `launchApp` or `artMode` */
+    control(device: TDevice, control: string, value: ControlState): Promise<unknown>;
+}
+
+/** What a TV offers to control in its device card */
+export interface TvCapabilities {
+    /** Inputs, e.g. `{ HDMI2: 'HDMI 2' }` */
+    inputs: Record<string, string>;
+    /** Apps, e.g. `{ YOUTUBE: 'YouTube' }` */
+    apps: Record<string, string>;
+    artMode: boolean;
 }
 
 /** A text in all admin languages */
@@ -320,6 +335,7 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
                     mapping: { true: 'connected', false: 'disconnected' },
                 },
             },
+            controls: this.controlsOf(device),
             indicators: [
                 {
                     id: 'paired',
@@ -337,6 +353,78 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
             hasDetails: true,
             group: { key: 'configured', name: t('Added TVs'), icon: TV_ICON },
         };
+    }
+
+    /**
+     * The controls of the device card: power, volume as a number, mute, input, app and Art Mode. Each one
+     * shows its state of the `control` channel and writes through the adapter, like writing that state.
+     */
+    public controlsOf(device: TDevice): DeviceControl<string>[] {
+        const base = `${this.adapter.namespace}.${device.name}.control`;
+        const capabilities = this.service.getCapabilities(device);
+        const handler = async (
+            _deviceId: string,
+            control: string,
+            value: ControlState,
+        ): Promise<ioBroker.State | { error: { code: number; message: string } }> => {
+            try {
+                await this.service.control(device, control, value);
+            } catch (error) {
+                return { error: { code: 500, message: error instanceof Error ? error.message : String(error) } };
+            }
+            return {
+                val: value,
+                ack: true,
+                ts: Date.now(),
+                lc: Date.now(),
+                from: this.adapter.namespace,
+            };
+        };
+        const options = (values: Record<string, string>): { label: string; value: string }[] =>
+            Object.entries(values).map(([value, label]) => ({ label, value }));
+
+        const controls: DeviceControl<string>[] = [
+            { id: 'power', type: 'switch', label: t('Power'), stateId: `${base}.power`, handler },
+            {
+                id: 'volume',
+                type: 'slider',
+                label: t('Volume'),
+                stateId: `${base}.volume`,
+                min: 0,
+                max: 100,
+                step: 1,
+                unit: '%',
+                controlDelay: 500,
+                handler,
+            },
+            { id: 'muted', type: 'switch', label: t('Muted'), stateId: `${base}.muted`, handler },
+        ];
+        if (Object.keys(capabilities.inputs).length) {
+            controls.push({
+                id: 'source',
+                type: 'select',
+                label: t('Input'),
+                stateId: `${base}.source`,
+                options: options(capabilities.inputs),
+                noTranslation: true,
+                handler,
+            });
+        }
+        if (Object.keys(capabilities.apps).length) {
+            controls.push({
+                id: 'launchApp',
+                type: 'select',
+                label: t('App'),
+                stateId: `${base}.launchApp`,
+                options: options(capabilities.apps),
+                noTranslation: true,
+                handler,
+            });
+        }
+        if (capabilities.artMode) {
+            controls.push({ id: 'artMode', type: 'switch', label: t('Art Mode'), stateId: `${base}.artMode`, handler });
+        }
+        return controls;
     }
 
     public discoveredDeviceInfo(device: TDevice): DeviceInfo<string> {
@@ -518,7 +606,8 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
             return { refresh: 'devices' };
         }
         await this.runInputs(device, context);
-        return { refresh: 'none' };
+        // the input list of the device card changes
+        return { refresh: 'devices' };
     }
 
     /** Ask for the order of the source menu */

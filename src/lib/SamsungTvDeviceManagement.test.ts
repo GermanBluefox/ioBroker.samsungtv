@@ -22,6 +22,7 @@ function createManager(service: Record<string, unknown> = {}): SamsungTvDeviceMa
         isDevicePaired: () => false,
         findDevice: () => null,
         suggestName: () => 'tv',
+        getCapabilities: () => ({ inputs: {}, apps: {}, artMode: false }),
         ...service,
     } as unknown as SamsungTvDeviceManagement['service'];
     return manager;
@@ -254,6 +255,56 @@ describe('Samsung TV device management', () => {
             'Token konnte nicht gesetzt werden: Der Token ist ungültig oder wurde vom TV abgelehnt.',
         );
         assert.equal(JSON.stringify(context.messages).includes('secret-token'), false);
+    });
+
+    it('controls power, volume, mute, input, app and Art Mode from the device card', async () => {
+        const calls: unknown[][] = [];
+        const device = { id: 'frame', name: 'living-room', api: 'tizen' };
+        const manager = createManager({
+            getCapabilities: () => ({
+                inputs: { TV: 'TV', HDMI2: 'HDMI 2' },
+                apps: { YOUTUBE: 'YouTube' },
+                artMode: true,
+            }),
+            control: async (value: ManagedDevice, control: string, state: unknown) =>
+                calls.push([value.id, control, state]),
+        });
+
+        const controls = manager.configuredDeviceInfo(device).controls ?? [];
+
+        assert.deepEqual(
+            controls.map(control => [control.id, control.type, control.stateId]),
+            [
+                ['power', 'switch', 'samsungtv.0.living-room.control.power'],
+                ['volume', 'slider', 'samsungtv.0.living-room.control.volume'],
+                ['muted', 'switch', 'samsungtv.0.living-room.control.muted'],
+                ['source', 'select', 'samsungtv.0.living-room.control.source'],
+                ['launchApp', 'select', 'samsungtv.0.living-room.control.launchApp'],
+                ['artMode', 'switch', 'samsungtv.0.living-room.control.artMode'],
+            ],
+        );
+        assert.deepEqual(controls[3]?.options, [
+            { label: 'TV', value: 'TV' },
+            { label: 'HDMI 2', value: 'HDMI2' },
+        ]);
+        const volume = controls[1]!;
+        const result = (await volume.handler!(device.id, 'volume', 25, undefined as never)) as ioBroker.State;
+        assert.equal(result.val, 25);
+        assert.deepEqual(calls, [['frame', 'volume', 25]]);
+    });
+
+    it('reports a failed control as an error of the device card', async () => {
+        const device = { id: 'frame', name: 'living-room', api: 'tizen' };
+        const manager = createManager({
+            control: async () => {
+                throw new Error('The TV does not answer');
+            },
+        });
+        const power = manager.configuredDeviceInfo(device).controls?.[0];
+        const result = (await power!.handler!(device.id, 'power', true, undefined as never)) as {
+            error: { message: string };
+        };
+        assert.equal(result.error.message, 'The TV does not answer');
     });
 
     it('renames and removes configured devices through the service', async () => {
