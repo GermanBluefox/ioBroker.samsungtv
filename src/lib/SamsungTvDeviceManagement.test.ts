@@ -301,6 +301,20 @@ describe('Samsung TV device management', () => {
         const result = (await volume.handler!(device.id, 'volume', 25, undefined as never)) as ioBroker.State;
         assert.equal(result.val, 25);
         assert.deepEqual(calls, [['frame', 'volume', 25]]);
+
+        // every control can report its current value, the card asks for it when it opens
+        assert.ok(controls.every(control => typeof control.getStateHandler === 'function'));
+        Object.assign(manager, {
+            adapter: {
+                namespace: 'samsungtv.0',
+                getForeignStateAsync: async (id: string) =>
+                    id === 'samsungtv.0.living-room.control.source' ? { val: 'HDMI2', ack: true } : null,
+            },
+        });
+        const source = (await controls[3].getStateHandler!(device.id, 'source', undefined as never)) as ioBroker.State;
+        assert.equal(source.val, 'HDMI2');
+        const missing = (await controls[0]!.getStateHandler!(device.id, 'power', undefined as never)) as ioBroker.State;
+        assert.equal(missing.val, null);
     });
 
     it('switches the TV on and off with a click on the power indicator', async () => {

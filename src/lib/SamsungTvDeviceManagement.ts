@@ -455,6 +455,14 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
                 from: this.adapter.namespace,
             };
         };
+        // the card asks for the current value when it shows a control; it is the state of the control channel
+        const getStateHandler = async (
+            _deviceId: string,
+            control: string,
+        ): Promise<ioBroker.State | { error: { code: number; message: string } }> => {
+            const state = await this.adapter.getForeignStateAsync(`${base}.${control}`);
+            return state ?? { val: null, ack: true, ts: Date.now(), lc: Date.now(), from: this.adapter.namespace };
+        };
         const options = (values: Record<string, string>): { label: string; value: string }[] =>
             Object.entries(values).map(([value, label]) => ({ label, value }));
 
@@ -499,7 +507,7 @@ export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDe
         if (capabilities.artMode) {
             controls.push({ id: 'artMode', type: 'switch', label: t('Art Mode'), stateId: `${base}.artMode`, handler });
         }
-        return controls;
+        return controls.map(control => ({ ...control, getStateHandler }));
     }
 
     /** The current value of a state of the TV, `null` if it has none */
