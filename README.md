@@ -91,8 +91,9 @@ the role `indicator`: as `media.mute` the type-detector would take this read-onl
 - `control.source`: an input (`TV`, `HDMI1`, `HDMI2`, ...) or a key code (`KEY_SOURCE`, `KEY_HDMI`). See
   [Inputs](#inputs).
 - `control.power`: `true` switches on, `false` off. Tizen TVs are woken with Wake-on-LAN first (if enabled and
-  the MAC address is known), also while they still answer in standby; `KEY_POWER` follows only if the TV is not on
-  after 10 s. The Frame wakes up in Art Mode; switching it on means TV, so the adapter leaves Art Mode once it is on.
+  the MAC address is known), also while they still answer in standby, repeated every 10 s for up to 60 s while the
+  TV stays unreachable (a TV that is still shutting down misses it); `KEY_POWER` follows only if the TV answers but
+  is not on after 10 s. The Frame wakes up in Art Mode; switching it on means TV, so the adapter leaves Art Mode once it is on.
   Switching off holds `KEY_POWER` for 3 s, because a short press may only switch to Art Mode.
 - `control.artMode`: `false` shows TV again: Art Mode off leaves the TV in the art selection, so the adapter then
   opens the source menu, which starts on the last input, and confirms it.

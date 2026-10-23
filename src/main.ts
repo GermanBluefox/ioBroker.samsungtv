@@ -106,6 +106,10 @@ const UPNP_REQUEST_TIMEOUT = 1500;
 const DEVICE_ERROR_QUALITY = 0x44;
 const POWER_POLL_INTERVAL = 2000;
 const POWER_POLL_DURATION = 30000;
+/** How long switching on waits and repeats Wake-on-LAN, in ms: a TV that is still shutting down misses the packet */
+const WAKE_DURATION = 60000;
+/** Pause between two Wake-on-LAN packets while the TV stays unreachable, in ms */
+const WOL_RETRY_INTERVAL = 10000;
 /** How long KEY_POWER is held to switch The Frame off instead of to Art Mode, in ms */
 const FRAME_POWER_OFF_HOLD = 3000;
 
@@ -2008,11 +2012,11 @@ async function runSceneSteps(
     }
 }
 
-/** Switch the TV on and wait until it reports so, at most `POWER_POLL_DURATION` */
+/** Switch the TV on and wait until it reports so, at most `WAKE_DURATION` */
 async function switchOnAndWait(device: RuntimeDevice): Promise<void> {
     await handleControl(device, `${device.name}.control.power`, 'power', true);
     await device.wakeTask;
-    const until = Date.now() + POWER_POLL_DURATION;
+    const until = Date.now() + WAKE_DURATION;
     while (Date.now() < until) {
         if ((await checkDeviceStatus(device)).power) {
             await adapter.setStateAsync(`${device.name}.state.power`, true, true);
@@ -2332,6 +2336,7 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
                 sendWol(device);
                 scheduleDevicePoll(device, 6000);
                 schedulePowerFallback(device, true, 'KEY_POWER', 10000);
+                scheduleWolRetries(device, Date.now() + WAKE_DURATION);
                 if (device.frameTv) {
                     device.wakeTask = showTvAfterWake(device)
                         .catch(e => adapter.log.warn(`${device.name} stays in Art Mode: ${errorMessage(e)}`))
@@ -2402,9 +2407,27 @@ function sendWol(device: RuntimeDevice): void {
         .catch(e => adapter.log.warn(`Wake-on-LAN for ${device.name} failed: ${errorMessage(e)}`));
 }
 
+/** Send Wake-on-LAN again every 10 s while the TV stays unreachable, until it is on or `until` */
+function scheduleWolRetries(device: RuntimeDevice, until: number): void {
+    adapter.setTimeout(async () => {
+        try {
+            const status = await checkDeviceStatus(device);
+            if (status.power || isUnloading || Date.now() > until) {
+                return;
+            }
+            if (!status.online) {
+                sendWol(device);
+            }
+            scheduleWolRetries(device, until);
+        } catch {
+            // the next poll shows the state
+        }
+    }, WOL_RETRY_INTERVAL);
+}
+
 /** The Frame wakes up in Art Mode; switching on means TV, so leave Art Mode once the TV is on */
 async function showTvAfterWake(device: RuntimeDevice): Promise<void> {
-    const until = Date.now() + POWER_POLL_DURATION;
+    const until = Date.now() + WAKE_DURATION;
     while (!(await checkDeviceStatus(device)).power) {
         if (Date.now() > until) {
             return;
