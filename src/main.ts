@@ -992,13 +992,21 @@ async function ensureDeviceObjects(device: RuntimeDevice): Promise<void> {
     await ensureState(`${base}.info.lastSeen`, 'Last Seen', 'number', 'value.time', 0, true);
     await ensureState(`${base}.info.paired`, 'Paired', 'boolean', 'indicator', false, true);
     await ensureState(`${base}.info.online`, 'Online', 'boolean', 'indicator.reachable', false, true);
+    // the same, inverted, in the role the device types of the type-detector look for (UNREACH)
+    await ensureState(`${base}.info.unreach`, 'Unreachable', 'boolean', 'indicator.maintenance.unreach', true, true);
     await ensureState(`${base}.info.tokenAuthSupport`, 'Token Auth Support', 'boolean', 'indicator', false, true);
     await removeStateIfExists(`${base}.info.remoteAvailable`);
     await removeStateIfExists(`${base}.info.hjAvailable`);
 
     await ensureState(`${base}.state.power`, 'Power', 'boolean', 'sensor.switch', false, true);
-    await ensureState(`${base}.state.volume`, 'Volume', 'number', 'value.volume', 0, true);
-    await ensureState(`${base}.state.muted`, 'Muted', 'boolean', 'media.mute', false, true);
+    await ensureState(`${base}.state.volume`, 'Volume', 'number', 'value.volume', 0, true, {
+        min: 0,
+        max: 100,
+        unit: '%',
+    });
+    // not media.mute: with its default role the type-detector takes a state as MUTE even if it is read-only,
+    // and would control the TV through this mirror instead of control.muted
+    await ensureState(`${base}.state.muted`, 'Muted', 'boolean', 'indicator', false, true);
     await removeStateIfExists(`${base}.state.app`);
     await removeStateIfExists(`${base}.state.source`);
 
@@ -1248,6 +1256,7 @@ async function pollDevice(device: RuntimeDevice): Promise<void> {
         const status = await checkDeviceStatus(device);
         const audio = resolveAudioStates(device, status);
         await adapter.setStateAsync(`${device.name}.info.online`, status.online, true);
+        await adapter.setStateAsync(`${device.name}.info.unreach`, !status.online, true);
         if (acceptPowerUpdate(device, status.power, Date.now())) {
             await adapter.setStateAsync(`${device.name}.state.power`, status.power, true);
             await adapter.setStateAsync(`${device.name}.control.power`, status.power, true);
@@ -3890,6 +3899,7 @@ async function handleUpnpNotify(req: http.IncomingMessage, body: string): Promis
         await adapter.setStateAsync(`${device.name}.state.muted`, muted, true);
     }
     await adapter.setStateAsync(`${device.name}.info.online`, true, true);
+    await adapter.setStateAsync(`${device.name}.info.unreach`, false, true);
     markSeen(device);
     adapter.log.debug(`UPnP notify for ${device.name}: volume=${volume ?? '-'} muted=${muted ?? '-'}`);
 }

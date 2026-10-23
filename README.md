@@ -63,7 +63,7 @@ If **no prompt** appears during pairing:
 Per TV:
 
 - `samsungtv.0.<tvname>.info.*`
-    - `id`, `ip`, `mac`, `model`, `uuid`, `api`, `lastSeen`, `paired`, `online`
+    - `id`, `ip`, `mac`, `model`, `uuid`, `api`, `lastSeen`, `paired`, `online`, `unreach` (the inverse of `online`)
     - `tokenAuthSupport`
 - `samsungtv.0.<tvname>.state.*`
     - `power`, `volume`, `muted`
@@ -77,6 +77,8 @@ The `control` channel follows the device type `tv` of the ioBroker type-detector
 and `control.key` (`media.key`) are required, `launchApp` (`media.app`), `source` (`media.input`), `artMode`
 (`switch.mode.art`), `volume`, `muted` and the volume buttons are optional. `key`, `launchApp` and `source` list
 their fixed values in `common.states`, so visualizations and the devices adapter can show them as buttons.
+`state.volume` is found as the actual volume (`VOLUME_ACTUAL`) and `info.unreach` as `UNREACH`. `state.muted` has
+the role `indicator`: as `media.mute` the type-detector would take this read-only mirror as the mute switch.
 
 ### Control (short)
 
@@ -179,6 +181,7 @@ Note: not every TV supports every key. Some keys only work when a menu/focus is 
 - (@GermanBluefox) Control power, volume, mute, input, app and Art Mode from the Device Manager card; large cards.
 - (@GermanBluefox) Switch Tizen TVs on with Wake-on-LAN first; switch The Frame off instead of to Art Mode.
 - (@GermanBluefox) Send Wake-on-LAN to the broadcast address of every network interface, not only to 255.255.255.255, and log it.
+- (@GermanBluefox) Add `info.unreach`; `state.muted` gets the role `indicator`, `state.volume` a range, so the type-detector finds the right states.
 
 ### 0.0.28
 
