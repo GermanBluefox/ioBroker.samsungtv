@@ -43,5 +43,6 @@
     "custom_samsungtv_steps_add": "Añadir paso...",
     "custom_samsungtv_steps_text": "Editar como texto",
     "custom_samsungtv_steps_list": "Editar con la lista",
-    "custom_samsungtv_steps_unknown": "El adaptador no conoce este paso"
+    "custom_samsungtv_steps_unknown": "El adaptador no conoce este paso",
+    "custom_samsungtv_steps_play": "Reproducir la escena ahora (también cambios sin guardar)"
 }

@@ -43,5 +43,6 @@
     "custom_samsungtv_steps_add": "Dodaj krok...",
     "custom_samsungtv_steps_text": "Edytuj jako tekst",
     "custom_samsungtv_steps_list": "Edytuj za pomocą listy",
-    "custom_samsungtv_steps_unknown": "Adapter nie zna tego kroku"
+    "custom_samsungtv_steps_unknown": "Adapter nie zna tego kroku",
+    "custom_samsungtv_steps_play": "Odtwórz scenę teraz (także niezapisane zmiany)"
 }

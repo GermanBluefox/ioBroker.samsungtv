@@ -1,7 +1,7 @@
 import React from 'react';
 
-import { Autocomplete, Box, Chip, IconButton, TextField, Tooltip } from '@mui/material';
-import { Edit, EditOff } from '@mui/icons-material';
+import { Autocomplete, Box, Chip, CircularProgress, IconButton, TextField, Tooltip } from '@mui/material';
+import { Edit, EditOff, ErrorOutlined, PlayArrow } from '@mui/icons-material';
 import { I18n } from '@iobroker/gui-components';
 import { ConfigGeneric, type ConfigGenericProps, type ConfigGenericState } from '@iobroker/json-config';
 
@@ -123,6 +123,10 @@ interface SceneStepsComponentState extends ConfigGenericState {
     raw: boolean;
     /** Text typed into the list */
     input: string;
+    /** The scene is being played on the TV */
+    playing: boolean;
+    /** Why the last play failed, empty if it went through */
+    playError: string;
 }
 
 /**
@@ -135,7 +139,7 @@ export default class SceneStepsComponent extends ConfigGeneric<ConfigGenericProp
 
     constructor(props: ConfigGenericProps) {
         super(props);
-        this.state = { ...this.state, devices: null, raw: false, input: '' };
+        this.state = { ...this.state, devices: null, raw: false, input: '', playing: false, playError: '' };
     }
 
     async componentDidMount(): Promise<void> {
@@ -214,6 +218,58 @@ export default class SceneStepsComponent extends ConfigGeneric<ConfigGenericProp
         return null;
     }
 
+    /** Play the steps as they are typed - not yet saved - on the TV of this row, or on all TVs */
+    async play(): Promise<void> {
+        this.setState({ playing: true, playError: '' });
+        let playError = '';
+        try {
+            const response: { error?: string } | null = await this.props.oContext.socket.sendTo(
+                `${this.props.oContext.adapterName}.${this.props.oContext.instance}`,
+                'testScene',
+                {
+                    name: this.props.data?.name,
+                    device: this.props.data?.device ?? '',
+                    steps: ConfigGeneric.getValue(this.props.data, this.stepsAttr),
+                    delay: this.props.data?.delay,
+                },
+            );
+            playError = response?.error ?? '';
+        } catch (e) {
+            playError = (e as Error).message || String(e);
+        }
+        if (this.mounted) {
+            this.setState({ playing: false, playError });
+        }
+    }
+
+    renderPlay(): React.JSX.Element {
+        const { playing, playError } = this.state;
+        return (
+            <Tooltip
+                title={
+                    playError || I18n.t(this.props.alive ? 'custom_samsungtv_steps_play' : 'custom_samsungtv_not_alive')
+                }
+            >
+                <span>
+                    <IconButton
+                        size="small"
+                        color={playError ? 'error' : 'primary'}
+                        disabled={!this.props.alive || playing || !this.steps.length}
+                        onClick={() => void this.play()}
+                    >
+                        {playing ? (
+                            <CircularProgress size={18} />
+                        ) : playError ? (
+                            <ErrorOutlined fontSize="small" />
+                        ) : (
+                            <PlayArrow fontSize="small" />
+                        )}
+                    </IconButton>
+                </span>
+            </Tooltip>
+        );
+    }
+
     add(value: string): void {
         const step = value.trim();
         if (step) {
@@ -236,6 +292,7 @@ export default class SceneStepsComponent extends ConfigGeneric<ConfigGenericProp
                         placeholder="ON, YOUTUBE, WAIT 3000, OK"
                         onChange={event => void this.onChange(this.stepsAttr, event.target.value)}
                     />
+                    {this.renderPlay()}
                     <Tooltip title={I18n.t('custom_samsungtv_steps_list')}>
                         <IconButton
                             size="small"
@@ -302,6 +359,7 @@ export default class SceneStepsComponent extends ConfigGeneric<ConfigGenericProp
                         />
                     )}
                 />
+                {this.renderPlay()}
                 <Tooltip title={I18n.t('custom_samsungtv_steps_text')}>
                     <IconButton
                         size="small"

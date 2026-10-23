@@ -64,7 +64,8 @@ interface TvInfo {
     apps: string[];
     /** Keys of `TV_INPUTS` */
     inputs: string[];
-    scenes: { id: string; name: string }[];
+    /** `on`: the scene begins with ON, so it also starts while the TV is off */
+    scenes: { id: string; name: string; on: boolean }[];
 }
 
 /** Names of the apps of `TV_APPS` */
@@ -662,6 +663,9 @@ export default class RemoteControlComponent extends ConfigGeneric<ConfigGenericP
         const row = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' };
         const small = { width: 40, height: 40 };
         const { power, artMode } = this.state;
+        // while the TV is off only power works, and the scenes that switch it on themselves
+        const off = this.isOff;
+        const scenes = off ? device.scenes.filter(scene => scene.on) : device.scenes;
 
         return (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', py: 2 }}>
@@ -684,7 +688,7 @@ export default class RemoteControlComponent extends ConfigGeneric<ConfigGenericP
                         '&:focus-visible': { boxShadow: '0 0 0 2px #1976d2, 0 10px 30px rgba(0,0,0,0.45)' },
                     }}
                 >
-                    <Box sx={row}>
+                    <Box sx={off ? { ...row, justifyContent: 'center' } : row}>
                         {this.renderKey(
                             'power',
                             { power: !power },
@@ -692,7 +696,7 @@ export default class RemoteControlComponent extends ConfigGeneric<ConfigGenericP
                             I18n.t(power ? 'custom_samsungtv_power_off' : 'custom_samsungtv_power_on'),
                             { backgroundColor: COLORS.power, '&:hover': { backgroundColor: COLORS.powerHover } },
                         )}
-                        {device.frameTv
+                        {device.frameTv && !off
                             ? this.renderKey(
                                   'artMode',
                                   { artMode: !artMode },
@@ -704,76 +708,95 @@ export default class RemoteControlComponent extends ConfigGeneric<ConfigGenericP
                                   },
                               )
                             : null}
-                        {this.code('KEY_SOURCE', <Input />, I18n.t('custom_samsungtv_source'))}
+                        {off ? null : this.code('KEY_SOURCE', <Input />, I18n.t('custom_samsungtv_source'))}
                     </Box>
 
                     {this.renderStatus()}
 
-                    {device.inputs.length
+                    {off ? null : (
+                        <>
+                            {device.inputs.length
+                                ? this.renderPills(
+                                      device.inputs.map(key => ({
+                                          id: `input:${key}`,
+                                          label: INPUT_NAMES[key] ?? key,
+                                          title: INPUT_NAMES[key] ?? key,
+                                          command: { input: key },
+                                      })),
+                                      Math.min(device.inputs.length, 3),
+                                  )
+                                : null}
+
+                            <Box sx={row}>
+                                {this.code('KEY_MENU', <Menu />, I18n.t('custom_samsungtv_menu'))}
+                                {this.code('KEY_INFO', <Info />, I18n.t('custom_samsungtv_info'))}
+                            </Box>
+
+                            {this.renderDpad()}
+
+                            <Box sx={row}>
+                                {this.code('KEY_RETURN', <ArrowBack />, I18n.t('custom_samsungtv_back'))}
+                                {this.code('KEY_HOME', <Home />, I18n.t('custom_samsungtv_home'))}
+                                {this.code('KEY_MUTE', <VolumeOff />, I18n.t('custom_samsungtv_mute'))}
+                            </Box>
+
+                            <Box sx={{ ...row, alignItems: 'stretch' }}>
+                                {this.renderRocker(
+                                    'KEY_VOLUP',
+                                    'KEY_VOLDOWN',
+                                    'VOL',
+                                    I18n.t('custom_samsungtv_volume_up'),
+                                    I18n.t('custom_samsungtv_volume_down'),
+                                )}
+                                {this.renderRocker(
+                                    'KEY_CHUP',
+                                    'KEY_CHDOWN',
+                                    'CH',
+                                    I18n.t('custom_samsungtv_channel_up'),
+                                    I18n.t('custom_samsungtv_channel_down'),
+                                )}
+                            </Box>
+
+                            <Box sx={{ ...row, gap: 0.5 }}>
+                                {this.code(
+                                    'KEY_REWIND',
+                                    <FastRewind fontSize="small" />,
+                                    I18n.t('custom_samsungtv_rewind'),
+                                    small,
+                                )}
+                                {this.code(
+                                    'KEY_PLAY',
+                                    <PlayArrow fontSize="small" />,
+                                    I18n.t('custom_samsungtv_play'),
+                                    small,
+                                )}
+                                {this.code(
+                                    'KEY_PAUSE',
+                                    <Pause fontSize="small" />,
+                                    I18n.t('custom_samsungtv_pause'),
+                                    small,
+                                )}
+                                {this.code(
+                                    'KEY_STOP',
+                                    <Stop fontSize="small" />,
+                                    I18n.t('custom_samsungtv_stop'),
+                                    small,
+                                )}
+                                {this.code(
+                                    'KEY_FF',
+                                    <FastForward fontSize="small" />,
+                                    I18n.t('custom_samsungtv_forward'),
+                                    small,
+                                )}
+                            </Box>
+
+                            {this.renderApps(device)}
+                        </>
+                    )}
+
+                    {scenes.length
                         ? this.renderPills(
-                              device.inputs.map(key => ({
-                                  id: `input:${key}`,
-                                  label: INPUT_NAMES[key] ?? key,
-                                  title: INPUT_NAMES[key] ?? key,
-                                  command: { input: key },
-                              })),
-                              Math.min(device.inputs.length, 3),
-                          )
-                        : null}
-
-                    <Box sx={row}>
-                        {this.code('KEY_MENU', <Menu />, I18n.t('custom_samsungtv_menu'))}
-                        {this.code('KEY_INFO', <Info />, I18n.t('custom_samsungtv_info'))}
-                    </Box>
-
-                    {this.renderDpad()}
-
-                    <Box sx={row}>
-                        {this.code('KEY_RETURN', <ArrowBack />, I18n.t('custom_samsungtv_back'))}
-                        {this.code('KEY_HOME', <Home />, I18n.t('custom_samsungtv_home'))}
-                        {this.code('KEY_MUTE', <VolumeOff />, I18n.t('custom_samsungtv_mute'))}
-                    </Box>
-
-                    <Box sx={{ ...row, alignItems: 'stretch' }}>
-                        {this.renderRocker(
-                            'KEY_VOLUP',
-                            'KEY_VOLDOWN',
-                            'VOL',
-                            I18n.t('custom_samsungtv_volume_up'),
-                            I18n.t('custom_samsungtv_volume_down'),
-                        )}
-                        {this.renderRocker(
-                            'KEY_CHUP',
-                            'KEY_CHDOWN',
-                            'CH',
-                            I18n.t('custom_samsungtv_channel_up'),
-                            I18n.t('custom_samsungtv_channel_down'),
-                        )}
-                    </Box>
-
-                    <Box sx={{ ...row, gap: 0.5 }}>
-                        {this.code(
-                            'KEY_REWIND',
-                            <FastRewind fontSize="small" />,
-                            I18n.t('custom_samsungtv_rewind'),
-                            small,
-                        )}
-                        {this.code('KEY_PLAY', <PlayArrow fontSize="small" />, I18n.t('custom_samsungtv_play'), small)}
-                        {this.code('KEY_PAUSE', <Pause fontSize="small" />, I18n.t('custom_samsungtv_pause'), small)}
-                        {this.code('KEY_STOP', <Stop fontSize="small" />, I18n.t('custom_samsungtv_stop'), small)}
-                        {this.code(
-                            'KEY_FF',
-                            <FastForward fontSize="small" />,
-                            I18n.t('custom_samsungtv_forward'),
-                            small,
-                        )}
-                    </Box>
-
-                    {this.renderApps(device)}
-
-                    {device.scenes.length
-                        ? this.renderPills(
-                              device.scenes.map(scene => ({
+                              scenes.map(scene => ({
                                   id: `scene:${scene.id}`,
                                   label: (
                                       <>

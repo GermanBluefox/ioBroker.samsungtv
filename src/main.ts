@@ -1876,9 +1876,39 @@ async function handleMessage(command: string, message: JsonObject): Promise<unkn
                 frameTv: !!device.frameTv,
                 apps: Object.keys(appStatesOf(device)),
                 inputs: Object.keys(inputStatesOf(device)),
-                scenes: Array.from(scenesOf(device)).map(([id, scene]) => ({ id, name: scene.name })),
+                scenes: Array.from(scenesOf(device)).map(([id, scene]) => ({
+                    id,
+                    name: scene.name,
+                    on: scene.steps[0]?.type === 'on',
+                })),
             })),
         };
+    }
+
+    if (command === 'testScene') {
+        // the play key of a row of the scene table: the steps as they are typed, not yet saved
+        let steps: SceneStep[];
+        try {
+            steps = parseScene(asString(message.steps));
+        } catch (e) {
+            return { error: errorMessage(e) };
+        }
+        if (!steps.length) {
+            return { error: 'The scene has no steps' };
+        }
+        const name = asString(message.device);
+        const targets = name ? [devicesByName.get(name)] : Array.from(devicesById.values());
+        if (!targets.length || targets.some(target => !target)) {
+            return { error: `Unknown TV ${name}` };
+        }
+        for (const target of targets as RuntimeDevice[]) {
+            await runSceneSteps(target, {
+                name: asString(message.name) || 'test',
+                steps,
+                delay: sceneDelay(message.delay),
+            });
+        }
+        return {};
     }
 
     const device = devicesByName.get(asString(message.device));
@@ -1932,6 +1962,14 @@ async function runSceneOf(device: RuntimeDevice, id: string): Promise<void> {
     if (!scene) {
         throw new Error(`Unknown scene ${id}`);
     }
+    await runSceneSteps(device, scene);
+}
+
+/** Run the steps of a scene, saved or only typed into the settings, on a TV */
+async function runSceneSteps(
+    device: RuntimeDevice,
+    scene: { name: string; steps: SceneStep[]; delay: number },
+): Promise<void> {
     if (runningScenes.has(device.id)) {
         throw new Error('Another scene is still running on this TV');
     }

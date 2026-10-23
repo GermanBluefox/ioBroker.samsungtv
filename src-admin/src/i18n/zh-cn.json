@@ -43,5 +43,6 @@
     "custom_samsungtv_steps_add": "添加步骤...",
     "custom_samsungtv_steps_text": "以文本编辑",
     "custom_samsungtv_steps_list": "用列表编辑",
-    "custom_samsungtv_steps_unknown": "适配器不认识此步骤"
+    "custom_samsungtv_steps_unknown": "适配器不认识此步骤",
+    "custom_samsungtv_steps_play": "立即播放场景（包括未保存的更改）"
 }

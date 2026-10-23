@@ -43,5 +43,6 @@
     "custom_samsungtv_steps_add": "Додати крок...",
     "custom_samsungtv_steps_text": "Редагувати як текст",
     "custom_samsungtv_steps_list": "Редагувати списком",
-    "custom_samsungtv_steps_unknown": "Адаптер не знає цього кроку"
+    "custom_samsungtv_steps_unknown": "Адаптер не знає цього кроку",
+    "custom_samsungtv_steps_play": "Відтворити сцену зараз (також незбережені зміни)"
 }
