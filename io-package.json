@@ -136,6 +136,7 @@
       }
     ],
     "compact": true,
+    "nogit": true,
     "supportedMessages": {
       "deviceManager": true
     }

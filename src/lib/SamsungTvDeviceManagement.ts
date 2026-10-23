@@ -1,0 +1,561 @@
+import path from 'node:path';
+import type { AdapterInstance } from '@iobroker/adapter-core';
+import {
+    DeviceManagement,
+    type ActionContext,
+    type ConfigItemNumber,
+    type ConfigItemPanel,
+    type ConfigItemSelect,
+    type ConfigItemText,
+    type DeviceAction,
+    type DeviceDetails,
+    type DeviceInfo,
+    type DeviceLoadContext,
+    type DeviceRefreshResponse,
+    type InstanceDetails,
+    type InstanceRefreshResponse,
+    type JsonFormData,
+} from '@iobroker/dm-utils';
+
+/** A configured or discovered TV as handed to the Device Manager by the adapter */
+export interface ManagedDevice {
+    id: string;
+    name: string;
+    displayName?: string;
+    ip?: string;
+    mac?: string;
+    model?: string;
+    api?: string;
+    protocol?: string;
+    port?: number | string;
+    uuid?: string;
+    source?: string | string[];
+}
+
+/**
+ * Adapter functionality the Device Manager calls into. Every device passed to a callback was
+ * obtained from `getConfiguredDevices`, `getDiscoveredDevices` or `findDevice` before.
+ */
+export interface DeviceManagementService<TDevice extends ManagedDevice = ManagedDevice> {
+    getConfiguredDevices(): TDevice[];
+    getDiscoveredDevices(): TDevice[];
+    isConfigured(device: TDevice): boolean;
+    isDevicePaired(device: TDevice): boolean;
+    suggestName(device: TDevice): string;
+    findDevice(id: string): TDevice | null | undefined;
+    discover(): Promise<unknown[]>;
+    addDevice(candidate: JsonFormData): Promise<unknown>;
+    renameDevice(id: string, name: string): Promise<unknown>;
+    removeDevice(id: string): Promise<unknown>;
+    requestPin(device: TDevice): Promise<unknown>;
+    confirmPin(device: TDevice, pin: string): Promise<unknown>;
+    pairTizen(device: TDevice): Promise<unknown>;
+    setTizenToken(device: TDevice, token: string): Promise<unknown>;
+}
+
+/** A text in all admin languages */
+export type TranslatedText = Record<ioBroker.Languages, string>;
+
+export const LANGUAGES: ioBroker.Languages[] = ['en', 'de', 'ru', 'pt', 'nl', 'fr', 'it', 'es', 'pl', 'uk', 'zh-cn'];
+const TRANSLATABLE_ERROR_KEYS = new Set(['Token rejected', 'Token changed', 'Token verification unavailable']);
+const TV_ICON = `data:image/svg+xml;base64,${Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="#1689c9" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8"><rect x="2.5" y="4" width="19" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></g></svg>',
+).toString('base64')}`;
+// Mid grey so the key reads on both light and dark admin themes; an <img> cannot inherit the theme colour.
+const KEY_ICON = `data:image/svg+xml;base64,${Buffer.from(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g fill="none" stroke="#808080" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3 20 3M16 7l3 3M18 5l2 2"/></g></svg>',
+).toString('base64')}`;
+
+function loadTranslations(): Record<string, Record<string, string>> {
+    const translations: Record<string, Record<string, string>> = {};
+    for (const language of LANGUAGES) {
+        try {
+            // Loaded at runtime from <adapter>/admin/i18n (this file runs from build/lib/)
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            translations[language] = require(path.join(__dirname, '..', '..', 'admin', 'i18n', `${language}.json`));
+        } catch {
+            translations[language] = {};
+        }
+    }
+    return translations;
+}
+
+const translations = loadTranslations();
+
+export function t(key: string): TranslatedText {
+    return Object.fromEntries(
+        LANGUAGES.map(language => [language, translations[language]![key] || key]),
+    ) as TranslatedText;
+}
+
+// The admin renders translated objects here as well, but dm-utils types these fields as plain strings.
+function tString(key: string): string {
+    return t(key) as unknown as string;
+}
+
+/** The add/edit form; the concrete item types let callers inspect single fields */
+export type DeviceFormSchema = ConfigItemPanel & {
+    items: {
+        name: ConfigItemText;
+        ip: ConfigItemText;
+        mac: ConfigItemText;
+        model: ConfigItemText;
+        id: ConfigItemText;
+        api: ConfigItemSelect;
+        protocol: ConfigItemSelect;
+        port: ConfigItemNumber;
+    };
+};
+
+export function deviceForm(
+    device: Partial<ManagedDevice> = {},
+    options: { readOnlyIdentity?: boolean } = {},
+): DeviceFormSchema {
+    const readOnlyIdentity = options.readOnlyIdentity === true;
+    return {
+        type: 'panel',
+        items: {
+            name: {
+                type: 'text',
+                label: t('Name'),
+                default: device.name || '',
+                xs: 12,
+                sm: 6,
+                validator: '!!data.name && /^[a-zA-Z0-9 _-]+$/.test(data.name)',
+                validatorErrorText: tString('Name validation error'),
+                validatorNoSaveOnError: true,
+            },
+            ip: {
+                type: 'text',
+                label: t('IP address'),
+                default: device.ip || '',
+                disabled: readOnlyIdentity,
+                validator: '!!data.ip || !!data.mac',
+                validatorErrorText: tString('IP or MAC required'),
+                validatorNoSaveOnError: true,
+                xs: 12,
+                sm: 6,
+            },
+            mac: {
+                type: 'text',
+                label: t('MAC address'),
+                default: device.mac || '',
+                disabled: readOnlyIdentity,
+                xs: 12,
+                sm: 6,
+            },
+            model: {
+                type: 'text',
+                label: t('Model'),
+                default: device.model || '',
+                disabled: readOnlyIdentity,
+                xs: 12,
+                sm: 6,
+            },
+            id: {
+                type: 'text',
+                label: t('Device ID'),
+                default: device.id || '',
+                disabled: readOnlyIdentity,
+                xs: 12,
+                sm: 6,
+            },
+            api: {
+                type: 'select',
+                label: t('API'),
+                default: device.api || 'unknown',
+                options: [
+                    { value: 'unknown', label: t('Automatic') },
+                    { value: 'tizen', label: 'Tizen' },
+                    { value: 'hj', label: 'Samsung H/J' },
+                    { value: 'legacy', label: 'Samsung TCP' },
+                ],
+                xs: 12,
+                sm: 6,
+            },
+            protocol: {
+                type: 'select',
+                label: t('Protocol'),
+                default: device.protocol || '',
+                options: [
+                    { value: '', label: t('Automatic') },
+                    { value: 'wss', label: 'WSS' },
+                    { value: 'ws', label: 'WS' },
+                    { value: 'tcp', label: 'TCP' },
+                ],
+                xs: 12,
+                sm: 6,
+            },
+            port: {
+                type: 'number',
+                label: t('Port'),
+                default: Number(device.port) || 0,
+                min: 0,
+                max: 65535,
+                xs: 12,
+                sm: 6,
+            },
+        },
+    };
+}
+
+export class SamsungTvDeviceManagement<TDevice extends ManagedDevice = ManagedDevice> extends DeviceManagement {
+    public service: DeviceManagementService<TDevice>;
+
+    public constructor(adapter: AdapterInstance, service: DeviceManagementService<TDevice>) {
+        super(adapter, true);
+        this.service = service;
+    }
+
+    public override getInstanceInfo(): InstanceDetails {
+        return {
+            apiVersion: 'v3',
+            communicationStateId: 'info.deviceManager',
+            identifierLabel: 'ID',
+            smallCards: true,
+            actions: [
+                {
+                    id: 'discover',
+                    icon: 'search',
+                    title: t('Scan'),
+                    description: t('Scan description'),
+                    timeout: 120000,
+                    handler: context => this.discover(context),
+                },
+                {
+                    id: 'manual-add',
+                    icon: 'add',
+                    title: t('Manual add'),
+                    description: t('Manual add description'),
+                    handler: context => this.manualAdd(context),
+                },
+            ],
+        };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/require-await -- kept async: callers await it
+    public override async loadDevices(context: DeviceLoadContext<string>): Promise<void> {
+        const configured = this.service.getConfiguredDevices();
+        const configuredIds = new Set(configured.map(device => device.id));
+        const discovered = this.service
+            .getDiscoveredDevices()
+            .filter(device => !configuredIds.has(device.id) && !this.service.isConfigured(device));
+        const devices = [
+            ...configured.map(device => this.configuredDeviceInfo(device)),
+            ...discovered.map(device => this.discoveredDeviceInfo(device)),
+        ];
+        context.setTotalDevices(devices.length);
+        for (const device of devices) {
+            context.addDevice(device);
+        }
+    }
+
+    public configuredDeviceInfo(device: TDevice): DeviceInfo<string> {
+        const namespace = this.adapter.namespace;
+        const paired = this.service.isDevicePaired(device);
+        const actions: DeviceAction<string>[] = [
+            {
+                id: 'rename',
+                icon: 'rename',
+                description: t('Rename'),
+                handler: (id, context) => this.rename(id, context),
+            },
+            {
+                id: 'delete',
+                icon: 'delete',
+                color: 'error',
+                description: t('Remove'),
+                confirmation: t('Remove confirmation'),
+                handler: id => this.remove(id),
+            },
+        ];
+        if (device.api === 'tizen' || device.api === 'hj' || device.api === 'unknown') {
+            actions.unshift({
+                id: 'pair',
+                icon: paired ? 'unpairDevice' : 'pairDevice',
+                description: t(paired ? 'Pair again' : 'Pair'),
+                timeout: 120000,
+                handler: (id, context) => this.pair(id, context),
+            });
+        }
+        if (device.api === 'tizen' || device.api === 'unknown') {
+            actions.splice(1, 0, {
+                id: 'set-token',
+                icon: KEY_ICON,
+                description: t('Set token'),
+                handler: (id, context) => this.setToken(id, context),
+            });
+        }
+        return {
+            id: device.id,
+            identifier: device.mac || device.uuid || device.id,
+            name: device.displayName || device.name,
+            icon: TV_ICON,
+            manufacturer: 'Samsung',
+            model: device.model || t('Unknown'),
+            connectionType: device.mac ? 'lan' : 'other',
+            status: {
+                connection: {
+                    stateId: `${namespace}.${device.name}.info.online`,
+                    mapping: { true: 'connected', false: 'disconnected' },
+                },
+            },
+            indicators: [
+                {
+                    id: 'paired',
+                    value: { stateId: `${namespace}.${device.name}.info.paired` },
+                    icon: 'unpairDevice',
+                    iconOn: 'pairDevice',
+                    color: 'inactive',
+                    colorOn: 'ok',
+                    text: paired ? t('Paired') : t('Not paired'),
+                    tooltip: t('Pairing status'),
+                    hideIfEmpty: false,
+                },
+            ],
+            actions,
+            hasDetails: true,
+            group: { key: 'configured', name: t('Added TVs'), icon: TV_ICON },
+        };
+    }
+
+    public discoveredDeviceInfo(device: TDevice): DeviceInfo<string> {
+        return {
+            id: device.id,
+            identifier: device.mac || device.uuid || device.id,
+            name: device.displayName || device.name || device.model || device.ip!,
+            icon: TV_ICON,
+            manufacturer: 'Samsung',
+            model: device.model || t('Unknown'),
+            connectionType: device.mac ? 'lan' : 'other',
+            status: 'connected',
+            indicators: [
+                {
+                    id: 'discovered',
+                    icon: 'search',
+                    color: 'info',
+                    text: t('Discovered'),
+                    tooltip: t('Discovered device'),
+                    hideIfEmpty: false,
+                },
+            ],
+            actions: [
+                {
+                    id: 'add',
+                    icon: 'add',
+                    title: t('Add'),
+                    variant: 'contained',
+                    description: t('Add discovered TV'),
+                    handler: (id, context) => this.addDiscovered(id, context),
+                },
+            ],
+            hasDetails: true,
+            group: { key: 'discovered', name: t('Discovered TVs'), icon: 'search' },
+        };
+    }
+
+    public override getDeviceDetails(id: string): DeviceDetails<string> | null {
+        const device = this.service.findDevice(id);
+        if (!device) {
+            return null;
+        }
+        return {
+            id,
+            schema: {
+                type: 'panel',
+                items: {
+                    ip: { type: 'staticInfo', label: t('IP address'), data: device.ip || '-' },
+                    mac: { type: 'staticInfo', label: t('MAC address'), data: device.mac || '-' },
+                    model: { type: 'staticInfo', label: t('Model'), data: device.model || '-' },
+                    api: { type: 'staticInfo', label: t('API'), data: device.api || 'unknown' },
+                    protocol: { type: 'staticInfo', label: t('Protocol'), data: device.protocol || '-' },
+                    source: {
+                        type: 'staticInfo',
+                        label: t('Found via'),
+                        data: Array.isArray(device.source) ? device.source.join(', ') : device.source || '-',
+                    },
+                },
+            },
+        };
+    }
+
+    public async discover(context: ActionContext): Promise<InstanceRefreshResponse> {
+        try {
+            const devices = await this.service.discover();
+            const message = t(devices.length === 1 ? 'One TV found' : 'TVs found');
+            await context.showMessage(
+                Object.fromEntries(
+                    LANGUAGES.map(language => [language, message[language].replace('%s', String(devices.length))]),
+                ) as TranslatedText,
+            );
+            return { refresh: true };
+        } catch (error) {
+            await context.showMessage(this.errorMessage('Discovery failed', error));
+            return { refresh: false };
+        }
+    }
+
+    public async manualAdd(context: ActionContext): Promise<InstanceRefreshResponse> {
+        const data = await context.showForm(deviceForm(), {
+            title: t('Manual add'),
+            buttons: ['cancel', 'apply'],
+        });
+        if (!data) {
+            return { refresh: false };
+        }
+        try {
+            await this.service.addDevice(data);
+            return { refresh: true };
+        } catch (error) {
+            await context.showMessage(this.errorMessage('Add failed', error));
+            return { refresh: false };
+        }
+    }
+
+    public async addDiscovered(id: string, context: ActionContext): Promise<DeviceRefreshResponse<string>> {
+        const device = this.service.findDevice(id);
+        if (!device) {
+            await context.showMessage(t('Unknown device'));
+            return { refresh: 'devices' };
+        }
+        const suggested = { ...device, name: this.service.suggestName(device) };
+        const data = await context.showForm(deviceForm(suggested, { readOnlyIdentity: true }), {
+            title: t('Add device'),
+            buttons: ['cancel', 'apply'],
+        });
+        if (!data) {
+            return { refresh: 'none' };
+        }
+        try {
+            await this.service.addDevice({ ...device, ...data, id: device.id });
+            return { refresh: 'devices' };
+        } catch (error) {
+            await context.showMessage(this.errorMessage('Add failed', error));
+            return { refresh: 'none' };
+        }
+    }
+
+    public async rename(id: string, context: ActionContext): Promise<DeviceRefreshResponse<string>> {
+        const device = this.service.findDevice(id);
+        if (!device) {
+            return { refresh: 'devices' };
+        }
+        const data = await context.showForm(
+            {
+                type: 'panel',
+                items: {
+                    name: {
+                        type: 'text',
+                        label: t('Name'),
+                        default: device.name,
+                        validator: '!!data.name && /^[a-zA-Z0-9 _-]+$/.test(data.name)',
+                        validatorErrorText: tString('Name validation error'),
+                        validatorNoSaveOnError: true,
+                        xs: 12,
+                    },
+                },
+            },
+            { title: t('Rename'), buttons: ['cancel', 'apply'] },
+        );
+        if (!data) {
+            return { refresh: 'none' };
+        }
+        try {
+            await this.service.renameDevice(id, data.name);
+            return { refresh: 'devices' };
+        } catch (error) {
+            await context.showMessage(this.errorMessage('Rename failed', error));
+            return { refresh: 'none' };
+        }
+    }
+
+    public async remove(id: string): Promise<DeviceRefreshResponse<string>> {
+        await this.service.removeDevice(id);
+        return { refresh: 'devices' };
+    }
+
+    public async pair(id: string, context: ActionContext): Promise<DeviceRefreshResponse<string>> {
+        const device = this.service.findDevice(id);
+        if (!device) {
+            await context.showMessage(t('Unknown device'));
+            return { refresh: 'devices' };
+        }
+        try {
+            if (device.api === 'hj') {
+                await this.service.requestPin(device);
+                const data = await context.showForm(
+                    {
+                        type: 'panel',
+                        items: {
+                            pin: {
+                                type: 'text',
+                                label: t('Enter PIN'),
+                                validator: '!!data.pin',
+                                validatorNoSaveOnError: true,
+                                xs: 12,
+                            },
+                        },
+                    },
+                    { title: t('Enter PIN'), buttons: ['cancel', 'apply'] },
+                );
+                if (!data) {
+                    return { refresh: 'none' };
+                }
+                await this.service.confirmPin(device, String(data.pin));
+            } else {
+                await this.service.pairTizen(device);
+            }
+            await context.showMessage(t('Paired'));
+            return { refresh: 'devices' };
+        } catch (error) {
+            await context.showMessage(this.errorMessage('Pairing failed', error));
+            return { refresh: 'devices' };
+        }
+    }
+
+    public async setToken(id: string, context: ActionContext): Promise<DeviceRefreshResponse<string>> {
+        const device = this.service.findDevice(id);
+        if (!device) {
+            await context.showMessage(t('Unknown device'));
+            return { refresh: 'devices' };
+        }
+        const data = await context.showForm(
+            {
+                type: 'panel',
+                items: {
+                    token: {
+                        type: 'password',
+                        label: t('Token'),
+                        validator: '!!data.token && !!data.token.trim()',
+                        validatorNoSaveOnError: true,
+                        xs: 12,
+                    },
+                },
+            },
+            { title: t('Set token'), buttons: ['cancel', 'apply'] },
+        );
+        if (!data) {
+            return { refresh: 'none' };
+        }
+        try {
+            await this.service.setTizenToken(device, String(data.token).trim());
+            await context.showMessage(t('Token saved'));
+            return { refresh: 'devices' };
+        } catch (error) {
+            await context.showMessage(this.errorMessage('Set token failed', error));
+            return { refresh: 'none' };
+        }
+    }
+
+    public errorMessage(prefix: string, error: unknown): TranslatedText {
+        const translated = t(prefix);
+        const detail = error instanceof Error ? error.message : String(error);
+        const translatedDetail = TRANSLATABLE_ERROR_KEYS.has(detail) ? t(detail) : null;
+        return Object.fromEntries(
+            LANGUAGES.map(language => [
+                language,
+                `${translated[language]}: ${translatedDetail ? translatedDetail[language] : detail}`,
+            ]),
+        ) as TranslatedText;
+    }
+}

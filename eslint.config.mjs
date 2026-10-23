@@ -13,7 +13,7 @@ const browserGlobals = {
 export default [
     ...config,
     {
-        ignores: ['admin/build/**', 'build/**', 'lib/hj/Pairing/Encryption/**'],
+        ignores: ['admin/build/**', 'build/**', 'src/lib/hj/Pairing/Encryption/**'],
     },
     {
         rules: {
@@ -37,7 +37,7 @@ export default [
         },
     },
     {
-        files: ['test/**/*.js', '**/*.test.js'],
+        files: ['test/**/*.js', '**/*.test.js', '**/*.test.ts'],
         languageOptions: {
             globals: globals.mocha,
         },

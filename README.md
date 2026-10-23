@@ -109,6 +109,7 @@ Note: not every TV supports every key. Some keys only work when a menu/focus is 
 - Add absolute volume and mute (`control.volume`, `control.muted`) over UPnP RenderingControl.
 - Fall back to the well-known RenderingControl endpoint when SSDP returns nothing.
 - (ioBroker-Bot) Adapter requires admin >= 7.8.23 now.
+- (@GermanBluefox) Migrate the adapter to TypeScript; the compiled code is built into `build/`. No functional changes.
 
 ### 0.0.28
 - Replace the custom React configuration page with native ioBroker JSONConfig and Device Manager components.
