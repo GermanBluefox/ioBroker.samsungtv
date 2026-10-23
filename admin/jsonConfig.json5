@@ -134,6 +134,26 @@
                 },
             },
         },
+        remote: {
+            type: 'panel',
+            label: 'Remote control',
+            items: {
+                _remoteControl: {
+                    type: 'custom',
+                    url: 'custom/customComponents.js',
+                    name: 'ConfigCustomSamsungTvSet/Components/RemoteControlComponent',
+                    i18n: true,
+                    guiApi: 2,
+                    bundlerType: 'module',
+                    newLine: true,
+                    xs: 12,
+                    sm: 12,
+                    md: 12,
+                    lg: 12,
+                    xl: 12,
+                },
+            },
+        },
         scenes: {
             type: 'panel',
             label: 'Scenes',
