@@ -160,6 +160,8 @@ interface DeviceChannels {
     nextAttempt: number;
     /** The TV refused the token; no new attempt before pairing anew */
     unauthorized: boolean;
+    /** A connection attempt is running; two polls at the same time must not open two channels */
+    connecting?: Promise<void>;
 }
 
 const channelsByDevice = new Map<string, DeviceChannels>();
@@ -782,7 +784,7 @@ function updateConfigDeviceFromDiscovery(match: Partial<RuntimeDevice> | null, i
             dev.mac = info.mac;
             updated = true;
         }
-        if (info.api && dev.api !== info.api) {
+        if (info.api && info.api !== 'unknown' && dev.api !== info.api) {
             dev.api = info.api;
             updated = true;
         }
@@ -1370,9 +1372,19 @@ async function maintainChannels(device: RuntimeDevice, on: boolean): Promise<voi
         channelsByDevice.set(device.id, entry);
     }
     const token = tizenTokenOf(device);
-    if (entry.unauthorized || (!token && device.tokenAuthSupport !== false) || Date.now() < entry.nextAttempt) {
-        return;
+    if (
+        entry.connecting ||
+        entry.unauthorized ||
+        (!token && device.tokenAuthSupport !== false) ||
+        Date.now() < entry.nextAttempt
+    ) {
+        return entry.connecting;
     }
+    entry.connecting = connectChannels(device, entry, token).finally(() => (entry.connecting = undefined));
+    return entry.connecting;
+}
+
+async function connectChannels(device: RuntimeDevice, entry: DeviceChannels, token: string): Promise<void> {
     try {
         if (!entry.remote?.connected) {
             entry.remote = openChannel(device, entry, buildTizenWsCandidates(device, token, ['v2'])[0]!);
@@ -3439,7 +3451,10 @@ async function performDiscovery(updateKnownDevices: boolean, timeoutOverride?: n
                     if (info.model && !match.model) {
                         match.model = info.model;
                     }
-                    match.api = info.api || match.api;
+                    // a probe that did not answer in time reports `unknown`; it must not replace a known API
+                    if (info.api && info.api !== 'unknown') {
+                        match.api = info.api;
+                    }
                     match.protocol = info.protocol || match.protocol;
                     match.port = info.port || match.port;
                     match.renderingControlUrl = info.renderingControlUrl || match.renderingControlUrl;
