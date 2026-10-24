@@ -1392,7 +1392,7 @@ async function connectChannels(device: RuntimeDevice, entry: DeviceChannels, tok
             adapter.log.debug(`Remote channel of ${device.name} open`);
         }
         if (device.frameTv && !entry.art?.connected) {
-            entry.art = openChannel(device, entry, artChannelUrl(device.ip, token));
+            entry.art = openChannel(device, entry, artChannelUrl(device.ip, token), true);
             await entry.art.connect();
             adapter.log.debug(`Art channel of ${device.name} open`);
         }
@@ -1404,8 +1404,13 @@ async function connectChannels(device: RuntimeDevice, entry: DeviceChannels, tok
     }
 }
 
-function openChannel(device: RuntimeDevice, entry: DeviceChannels, url: string): PersistentChannel {
-    const channel = new PersistentChannel(url);
+function openChannel(
+    device: RuntimeDevice,
+    entry: DeviceChannels,
+    url: string,
+    waitForReady = false,
+): PersistentChannel {
+    const channel = new PersistentChannel(url, waitForReady);
     channel.on('close', ({ intentional }: { intentional: boolean }) => {
         if (!intentional && !isUnloading) {
             // off or power cut: look now instead of at the next poll

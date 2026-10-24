@@ -24,8 +24,15 @@ export class PersistentChannel extends EventEmitter {
     private open = false;
     private closing = false;
 
-    /** @param url the channel URL with name and token, e.g. `wss://<ip>:8002/api/v2/channels/samsung.remote.control?…` */
-    constructor(private readonly url: string) {
+    /**
+     * @param url the channel URL with name and token, e.g. `wss://<ip>:8002/api/v2/channels/samsung.remote.control?…`
+     * @param waitForReady wait for ms.channel.ready, not only ms.channel.connect: the art channel takes requests
+     *   only then (as the prototype did; requests before it left the Art service of The Frame hanging)
+     */
+    constructor(
+        private readonly url: string,
+        private readonly waitForReady = false,
+    ) {
         super();
     }
 
@@ -56,7 +63,10 @@ export class PersistentChannel extends EventEmitter {
                 }
                 ws.terminate();
             };
-            pending.timer = setTimeout(() => fail(new Error('Channel: no ms.channel.connect')), CONNECT_TIMEOUT);
+            pending.timer = setTimeout(
+                () => fail(new Error(`Channel: no ${this.waitForReady ? 'ms.channel.ready' : 'ms.channel.connect'}`)),
+                CONNECT_TIMEOUT,
+            );
             ws.on('error', error => fail(error));
             ws.on('close', code => {
                 clearTimeout(pending.timer);
@@ -82,7 +92,7 @@ export class PersistentChannel extends EventEmitter {
                 if (message.event === 'ms.channel.timeOut') {
                     return fail(new Error('Channel: timeout'));
                 }
-                if (message.event === 'ms.channel.connect' && !settled) {
+                if (message.event === (this.waitForReady ? 'ms.channel.ready' : 'ms.channel.connect') && !settled) {
                     settled = true;
                     clearTimeout(pending.timer);
                     this.open = true;

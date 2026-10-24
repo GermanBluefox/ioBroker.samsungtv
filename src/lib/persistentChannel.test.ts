@@ -59,6 +59,13 @@ describe('persistent channel', () => {
         assert.equal(channel.connected, false);
     });
 
+    it('waits for ms.channel.ready if asked to', async function () {
+        this.timeout(8000);
+        // the fake TV of this test never sends ready
+        const channel = new PersistentChannel(url, true);
+        await assert.rejects(channel.connect(), /no ms.channel/);
+    });
+
     it('reports a close by the TV as not intentional', async () => {
         const channel = new PersistentChannel(url);
         await channel.connect();
