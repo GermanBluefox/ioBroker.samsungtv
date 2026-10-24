@@ -39,7 +39,7 @@
     "dependencies": {
         "@iobroker/adapter-core": "^3.4.3",
         "@iobroker/dm-utils": "^3.2.1",
-        "@iobroker/youtube-lounge": "^0.1.0",
+        "@iobroker/youtube-lounge": "^0.2.0",
         "bonjour-service": "^1.4.4",
         "fast-xml-parser": "^5.11.2",
         "ws": "^8.22.0"
