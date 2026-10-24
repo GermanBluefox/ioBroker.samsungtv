@@ -209,6 +209,10 @@ export default class SceneStepsComponent extends ConfigGeneric<ConfigGenericProp
 
     /** The label of a step for its chip, `null` if the adapter does not know it */
     labelOf(step: string, options: StepOption[]): string | null {
+        const youtube = /^youtube\s*:\s*(.+)$/i.exec(step.trim())?.[1];
+        if (youtube) {
+            return `YouTube: ${youtube}`;
+        }
         const value = normalize(step);
         const option = options.find(entry => normalize(entry.value) === value);
         if (option) {

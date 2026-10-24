@@ -12,9 +12,11 @@
  *   that starts with it can be started from standby
  * - `CLOSE YOUTUBE`: close an app
  * - `HOLD POWER 3000`: hold a key for the given ms (1000 if omitted)
+ * - `YOUTUBE:<video, playlist, channel or URL>`: play it in the YouTube app, see `parseYouTubeTarget`
  * separated by commas, semicolons or new lines; case and spaces do not matter.
  */
 import { TV_APPS, TV_INPUTS, TV_KEY_CODES } from './tvValues';
+import { parseYouTubeTarget } from './youtubeLounge';
 
 /** Short names a user is likely to type, in addition to the keys of `TV_KEYS` */
 const KEY_ALIASES: Readonly<Record<string, string>> = {
@@ -42,6 +44,7 @@ export type SceneStep =
     | { type: 'key'; key: string }
     | { type: 'hold'; key: string; ms: number }
     | { type: 'close'; app: string }
+    | { type: 'youtube'; target: string }
     | { type: 'app'; app: string }
     | { type: 'input'; input: string }
     | { type: 'wait'; ms: number };
@@ -77,6 +80,13 @@ function keyCodeOf(name: string): string | null {
 export function parseScene(steps: string): SceneStep[] {
     const result: SceneStep[] = [];
     for (const raw of String(steps ?? '').split(/[,\n;]/)) {
+        // the IDs of YouTube are case sensitive
+        const youtube = /^youtube\s*:\s*(.+)$/i.exec(raw.trim())?.[1];
+        if (youtube) {
+            parseYouTubeTarget(youtube);
+            result.push({ type: 'youtube', target: youtube });
+            continue;
+        }
         const token = raw.trim().toUpperCase().replace(/\s+/g, ' ');
         if (!token) {
             continue;
@@ -134,6 +144,7 @@ export interface SceneRunner {
     sendKey: (key: string) => Promise<void>;
     holdKey: (key: string, ms: number) => Promise<void>;
     closeApp: (app: string) => Promise<void>;
+    youtube: (target: string) => Promise<void>;
     launchApp: (app: string) => Promise<void>;
     selectInput: (input: string) => Promise<void>;
     sleep: (ms: number) => Promise<void>;
@@ -159,6 +170,8 @@ export async function runScene(steps: SceneStep[], delay: number, runner: SceneR
             await runner.holdKey(step.key, step.ms);
         } else if (step.type === 'close') {
             await runner.closeApp(step.app);
+        } else if (step.type === 'youtube') {
+            await runner.youtube(step.target);
         } else if (step.type === 'app') {
             await runner.launchApp(step.app);
         } else if (step.type === 'input') {

@@ -29,6 +29,7 @@ import { getPingArguments, normalizeMac, parseArpTable, parseMacFromArpOutput } 
 import { acceptPowerUpdate, startPowerTransition } from './lib/powerTransitionTools';
 import { boundedSeconds } from './lib/timerTools';
 import { parseScene, runScene, sceneDelay, sceneId, type SceneStep } from './lib/scenes';
+import { YouTubeLounge, YouTubeSessionError, getScreenIdFromDial, parseYouTubeTarget } from './lib/youtubeLounge';
 import { SOURCE_MENU_DELAY, SOURCE_MENU_KEY_GAP, parseSourceMenu, sourceMenuKeys } from './lib/sourceMenu';
 import { evaluateTizenTokenMessage } from './lib/tizenTokenTools';
 import { wakeOnLan } from './lib/wakeOnLan';
@@ -1051,8 +1052,11 @@ async function ensureDeviceObjects(device: RuntimeDevice): Promise<void> {
         await ensureState(`${base}.control.closeApp`, 'Close App', 'string', 'text', '', false, {
             states: appStatesOf(device),
         });
+        // a video ID, playlist, channel or YouTube URL, or play / pause / next / previous
+        await ensureState(`${base}.control.youtube`, 'Play on YouTube', 'string', 'text', '', false);
     } else {
         await removeStateIfExists(`${base}.control.closeApp`);
+        await removeStateIfExists(`${base}.control.youtube`);
     }
     await ensureState(`${base}.control.source`, 'Source', 'string', 'media.input', '', false, {
         states: inputStatesOf(device),
@@ -2009,6 +2013,9 @@ async function handleMessage(command: string, message: JsonObject): Promise<unkn
         case 'closeApp':
             await closeAppOf(device, asString(message.app));
             return {};
+        case 'youtube':
+            await playYouTube(device, asString(message.target));
+            return {};
         case 'input':
             await selectSource(device, asString(message.input));
             return {};
@@ -2062,6 +2069,7 @@ async function runSceneSteps(
             powerOn: () => switchOnAndWait(device),
             holdKey: (key, ms) => holdKey(device, key, ms),
             closeApp: app => closeAppOf(device, app),
+            youtube: target => playYouTube(device, target),
             sendKey: key => sendKey(device, key),
             launchApp: app => launchAppOf(device, app),
             selectInput: input => selectSource(device, input),
@@ -2156,6 +2164,15 @@ async function handleControl(
             if (typeof value === 'string' && value.trim()) {
                 await closeAppOf(device, value.trim());
                 await adapter.setStateAsync(id, '', true);
+            }
+            return;
+        case 'youtube':
+            if (typeof value === 'string' && value.trim()) {
+                try {
+                    await playYouTube(device, value.trim());
+                } finally {
+                    await adapter.setStateAsync(id, '', true);
+                }
             }
             return;
         case 'source':
@@ -2735,6 +2752,56 @@ async function launchAppOf(device: RuntimeDevice, app: string): Promise<void> {
     }
     adapter.log.debug(`REST app launch failed on ${device.name} (${errorMessage(restError)}), trying the websocket`);
     await launchApp(device, appIds[0]!);
+}
+
+/** Lounge sessions with the YouTube app, per TV */
+const youtubeSessions = new Map<string, YouTubeLounge>();
+
+/**
+ * Play a video, playlist or the uploads of a channel in the YouTube app, or send play / pause / next / previous.
+ * Goes over the YouTube Lounge API of Google, the only way the TV accepts; see `youtubeLounge.ts`.
+ */
+async function playYouTube(device: RuntimeDevice, input: string): Promise<void> {
+    if (device.api !== 'tizen') {
+        throw new Error(`YouTube is only supported for Tizen devices (${device.name})`);
+    }
+    const target = parseYouTubeTarget(input);
+    let lounge = youtubeSessions.get(device.id);
+    if (!lounge?.paired) {
+        lounge = new YouTubeLounge('ioBroker');
+        await lounge.pair(await youtubeScreenId(device));
+        youtubeSessions.set(device.id, lounge);
+    }
+    try {
+        await lounge.play(target);
+    } catch (e) {
+        if (!(e instanceof YouTubeSessionError)) {
+            throw e;
+        }
+        // session or token expired: once again from the start
+        if (!lounge.paired) {
+            await lounge.pair(await youtubeScreenId(device));
+        }
+        await lounge.play(target);
+    }
+    adapter.log.debug(`YouTube on ${device.name}: ${target.kind}`);
+    markSeen(device);
+}
+
+/** The screen of the YouTube app; the app reports it over DIAL, so it is started if it does not answer */
+async function youtubeScreenId(device: RuntimeDevice): Promise<string> {
+    let screenId = await getScreenIdFromDial(device.ip);
+    for (let attempt = 0; !screenId && attempt < 5; attempt++) {
+        if (attempt === 0) {
+            await launchAppOf(device, 'YOUTUBE');
+        }
+        await sleep(2000);
+        screenId = await getScreenIdFromDial(device.ip);
+    }
+    if (!screenId) {
+        throw new Error(`The YouTube app of ${device.name} does not report its screen`);
+    }
+    return screenId;
 }
 
 /** Close an app: a key of `TV_APPS` (`YOUTUBE`) or an app ID of the TV */

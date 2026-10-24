@@ -37,6 +37,15 @@ describe('scenes', () => {
         assert.throws(() => parseScene('CLOSE HDMI2'), /Unknown step "CLOSE HDMI2"/);
     });
 
+    it('plays YouTube targets and keeps their case', () => {
+        assert.deepEqual(parseScene('ON, YouTube: UCBR8-60-B28hp2BmDPdntcQ, youtube:jNQXAC9IVRw'), [
+            { type: 'on' },
+            { type: 'youtube', target: 'UCBR8-60-B28hp2BmDPdntcQ' },
+            { type: 'youtube', target: 'jNQXAC9IVRw' },
+        ]);
+        assert.throws(() => parseScene('YOUTUBE:@someone'), /Not a YouTube video/);
+    });
+
     it('switches the TV on with ON', () => {
         assert.deepEqual(parseScene('on, Power On, YOUTUBE'), [
             { type: 'on' },
@@ -70,6 +79,7 @@ describe('scenes', () => {
             powerOn: () => Promise.resolve(void calls.push('on')),
             holdKey: (key, ms) => Promise.resolve(void calls.push(`hold ${key} ${ms}`)),
             closeApp: app => Promise.resolve(void calls.push(`close ${app}`)),
+            youtube: target => Promise.resolve(void calls.push(`youtube ${target}`)),
             sendKey: key => Promise.resolve(void calls.push(key)),
             launchApp: app => Promise.resolve(void calls.push(`app ${app}`)),
             selectInput: input => Promise.resolve(void calls.push(`input ${input}`)),
