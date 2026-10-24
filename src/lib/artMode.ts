@@ -94,6 +94,86 @@ export function artChannelUrl(ip: string, token: string): string {
 }
 
 /**
+ * An art channel that is already open (see `PersistentChannel`). While one is open, The Frame answers art requests
+ * only there, not on a second connection.
+ */
+export interface OpenArtChannel {
+    send(payload: Record<string, unknown>): void;
+    on(event: 'message', listener: (message: { event?: string; data?: unknown }) => void): unknown;
+    off(event: 'message', listener: (message: { event?: string; data?: unknown }) => void): unknown;
+}
+
+/** Where art requests go: the URL for a connection of their own, or an open channel */
+export type ArtTarget = string | OpenArtChannel;
+
+function artPayload(request: string, params: Record<string, unknown>, requestId: string): Record<string, unknown> {
+    return {
+        method: 'ms.channel.emit',
+        params: {
+            event: 'art_app_request',
+            to: 'host',
+            data: JSON.stringify({ request, ...params, id: requestId, request_id: requestId }),
+        },
+    };
+}
+
+/** Like `artRequest`, over an open channel */
+function artRequestOnChannel<T>(
+    channel: OpenArtChannel,
+    request: string,
+    params: Record<string, unknown>,
+    done: (data: ArtEvent, requestId: string) => T | undefined,
+    timeout: number,
+): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const requestId = randomUUID();
+        const listener = (message: { event?: string; data?: unknown }): void => {
+            if (message.event !== 'd2d_service_message' || !message.data || typeof message.data !== 'object') {
+                return;
+            }
+            const data = message.data as ArtEvent;
+            if (data.event === 'error' && (data.request_id ?? data.id) === requestId) {
+                finish(new Error(`Art Mode: ${request} failed`));
+                return;
+            }
+            const result = done(data, requestId);
+            if (result !== undefined) {
+                finish(null, result);
+            }
+        };
+        const timer = setTimeout(() => finish(new Error(`Art Mode: no answer to ${request}`)), timeout);
+        function finish(error: Error | null, result?: T): void {
+            clearTimeout(timer);
+            channel.off('message', listener);
+            if (error) {
+                reject(error);
+            } else {
+                resolve(result as T);
+            }
+        }
+        channel.on('message', listener);
+        try {
+            channel.send(artPayload(request, params, requestId));
+        } catch (e) {
+            finish(e instanceof Error ? e : new Error(String(e)));
+        }
+    });
+}
+
+/** Send an art request to `target`: over the open channel, or over a connection of its own */
+function artRequestTo<T>(
+    target: ArtTarget,
+    request: string,
+    params: Record<string, unknown>,
+    done: (data: ArtEvent, requestId: string) => T | undefined,
+    timeout: number,
+): Promise<T> {
+    return typeof target === 'string'
+        ? artRequest(target, request, params, done, timeout)
+        : artRequestOnChannel(target, request, params, done, timeout);
+}
+
+/**
  * Send one art request and wait until `done` accepts an event.
  *
  * @param url URL of the art channel, see `artChannelUrl`
@@ -139,16 +219,7 @@ function artRequest<T>(
                 return;
             }
             sent = true;
-            ws.send(
-                JSON.stringify({
-                    method: 'ms.channel.emit',
-                    params: {
-                        event: 'art_app_request',
-                        to: 'host',
-                        data: JSON.stringify({ request, ...params, id: requestId, request_id: requestId }),
-                    },
-                }),
-            );
+            ws.send(JSON.stringify(artPayload(request, params, requestId)));
         };
 
         ws.on('error', error => finish(error));
@@ -186,11 +257,11 @@ function artRequest<T>(
 /**
  * Read whether the Art Mode is on.
  *
- * @param url URL of the art channel, see `artChannelUrl`
+ * @param target URL of the art channel (see `artChannelUrl`) or the open channel
  */
-export function getArtMode(url: string): Promise<boolean> {
-    return artRequest(
-        url,
+export function getArtMode(target: ArtTarget): Promise<boolean> {
+    return artRequestTo(
+        target,
         'get_artmode_status',
         {},
         (data, requestId) => ((data.request_id ?? data.id) === requestId ? (artValue(data) ?? undefined) : undefined),
@@ -201,11 +272,11 @@ export function getArtMode(url: string): Promise<boolean> {
 /**
  * Read the artwork The Frame shows (or would show in Art Mode).
  *
- * @param url URL of the art channel, see `artChannelUrl`
+ * @param target URL of the art channel (see `artChannelUrl`) or the open channel
  */
-export function getCurrentArtwork(url: string): Promise<Artwork> {
-    return artRequest(
-        url,
+export function getCurrentArtwork(target: ArtTarget): Promise<Artwork> {
+    return artRequestTo(
+        target,
         'get_current_artwork',
         {},
         (data, requestId) =>
@@ -219,12 +290,12 @@ export function getCurrentArtwork(url: string): Promise<Artwork> {
 /**
  * Switch the Art Mode and wait until the TV reports the switch with `art_mode_changed`.
  *
- * @param url URL of the art channel, see `artChannelUrl`
+ * @param target URL of the art channel (see `artChannelUrl`) or the open channel
  * @param on `true` to switch it on
  */
-export function setArtMode(url: string, on: boolean): Promise<boolean> {
-    return artRequest(
-        url,
+export function setArtMode(target: ArtTarget, on: boolean): Promise<boolean> {
+    return artRequestTo(
+        target,
         'set_artmode_status',
         { value: on ? 'on' : 'off' },
         data => (data.event === 'art_mode_changed' && artValue(data) === on ? on : undefined),

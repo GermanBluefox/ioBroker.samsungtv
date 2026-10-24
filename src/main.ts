@@ -20,7 +20,7 @@ import {
     findVisibleApp,
     launchAppRest,
 } from './lib/apps';
-import { artChannelUrl, getArtMode, getCurrentArtwork, setArtMode } from './lib/artMode';
+import { type ArtTarget, artChannelUrl, getArtMode, getCurrentArtwork, setArtMode } from './lib/artMode';
 import { SsdpClient } from './lib/discovery/SsdpClient';
 import { SamsungTv as SamsungHJ } from './lib/hj/SamsungTv';
 import { LegacyRemote } from './lib/legacy/LegacyRemote';
@@ -1473,6 +1473,12 @@ function tizenTokenOf(device: RuntimeDevice): string {
     return token === NO_TOKEN ? '' : token || '';
 }
 
+/** Art requests go over the open art channel if there is one; The Frame answers only there then */
+function artTargetOf(device: RuntimeDevice): ArtTarget {
+    const channel = channelsByDevice.get(device.id)?.art;
+    return channel?.connected ? channel : artChannelUrl(device.ip, tizenTokenOf(device));
+}
+
 /** Read the Art Mode of a The Frame into `control.artMode`; off while the TV is off */
 async function pollArtMode(device: RuntimeDevice, on: boolean): Promise<void> {
     if (!device.frameTv || (device.artSwitchUntil && Date.now() < device.artSwitchUntil)) {
@@ -1481,7 +1487,7 @@ async function pollArtMode(device: RuntimeDevice, on: boolean): Promise<void> {
     let artMode = false;
     if (on) {
         try {
-            artMode = await getArtMode(artChannelUrl(device.ip, tizenTokenOf(device)));
+            artMode = await getArtMode(artTargetOf(device));
         } catch (e) {
             adapter.log.debug(`Art Mode of ${device.name} not readable: ${errorMessage(e)}`);
             return;
@@ -1490,7 +1496,7 @@ async function pollArtMode(device: RuntimeDevice, on: boolean): Promise<void> {
     await adapter.setStateAsync(`${device.name}.control.artMode`, artMode, true);
     if (on) {
         try {
-            const artwork = await getCurrentArtwork(artChannelUrl(device.ip, tizenTokenOf(device)));
+            const artwork = await getCurrentArtwork(artTargetOf(device));
             await adapter.setStateAsync(`${device.name}.state.artwork`, artwork.contentId, true);
         } catch (e) {
             adapter.log.debug(`Artwork of ${device.name} not readable: ${errorMessage(e)}`);
@@ -1503,12 +1509,12 @@ async function setArtModeOf(device: RuntimeDevice, on: boolean): Promise<void> {
     if (!device.frameTv) {
         throw new Error(`${device.name} has no Art Mode`);
     }
-    const url = artChannelUrl(device.ip, tizenTokenOf(device));
+    const target = artTargetOf(device);
     device.artSwitchUntil = Date.now() + 20000;
     try {
         // the TV reports no art_mode_changed if nothing changes
-        if ((await getArtMode(url)) !== on) {
-            await setArtMode(url, on);
+        if ((await getArtMode(target)) !== on) {
+            await setArtMode(target, on);
             if (!on) {
                 // off leaves the TV in the art selection; the source menu opens on the last input
                 await sendKey(device, 'KEY_SOURCE');
@@ -2653,7 +2659,7 @@ async function showTvAfterWake(device: RuntimeDevice): Promise<void> {
     // the art channel answers only a few seconds after waking up
     for (let attempt = 1; ; attempt++) {
         try {
-            if (await getArtMode(artChannelUrl(device.ip, tizenTokenOf(device)))) {
+            if (await getArtMode(artTargetOf(device))) {
                 await setArtModeOf(device, false);
             }
             return;

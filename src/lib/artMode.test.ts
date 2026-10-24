@@ -4,6 +4,7 @@ import { after, before, describe, it } from 'mocha';
 import type WebSocket from 'ws';
 import { WebSocketServer } from 'ws';
 import { getArtMode, getCurrentArtwork, setArtMode } from './artMode';
+import { PersistentChannel } from './persistentChannel';
 
 /**
  * A fake art channel that answers like The Frame 2022: the answer is named like the request and carries
@@ -87,6 +88,19 @@ describe('Art Mode', () => {
 
     it('reads the current artwork', async () => {
         assert.deepEqual(await getCurrentArtwork(url), { contentId: 'MY_F0003', matteId: 'shadowbox_polar' });
+    });
+
+    it('asks over an open channel; the TV answers only there while one is open', async () => {
+        const channel = new PersistentChannel(url);
+        await channel.connect();
+        try {
+            state.artMode = false;
+            assert.equal(await setArtMode(channel, true), true);
+            assert.equal(await getArtMode(channel), true);
+            assert.deepEqual(await getCurrentArtwork(channel), { contentId: 'MY_F0003', matteId: 'shadowbox_polar' });
+        } finally {
+            channel.close();
+        }
     });
 
     it('sends the request after ms.channel.connect if the TV sends no ms.channel.ready', async () => {
