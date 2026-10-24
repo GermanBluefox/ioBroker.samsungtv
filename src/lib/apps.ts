@@ -39,10 +39,16 @@ export const SAMSUNG_APPS: Readonly<Record<string, { name: string; ids: string[]
 };
 
 /**
- * One request to the app endpoint of the REST API. Resolves with the HTTP status, 0 if the TV does not answer.
- * `agent: false`: the TV closes the connection after every answer, a keep-alive agent fails every second request.
+ * One request to the app endpoint of the REST API. Resolves with the HTTP status (0 if the TV does not answer)
+ * and the body. `agent: false`: the TV closes the connection after every answer, a keep-alive agent fails every
+ * second request.
  */
-function appRequest(ip: string, appId: string, method: 'GET' | 'POST', timeout = 3000): Promise<number> {
+function appRequestWithBody(
+    ip: string,
+    appId: string,
+    method: 'GET' | 'POST' | 'DELETE',
+    timeout = 3000,
+): Promise<{ status: number; body: string }> {
     return new Promise(resolve => {
         const req = http.request(
             {
@@ -54,14 +60,62 @@ function appRequest(ip: string, appId: string, method: 'GET' | 'POST', timeout =
                 agent: false,
             },
             res => {
-                res.resume();
-                res.on('end', () => resolve(res.statusCode ?? 0));
+                const chunks: Buffer[] = [];
+                res.on('data', (chunk: Buffer) => chunks.push(chunk));
+                res.on('end', () =>
+                    resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }),
+                );
             },
         );
         req.on('timeout', () => req.destroy());
-        req.on('error', () => resolve(0));
+        req.on('error', () => resolve({ status: 0, body: '' }));
         req.end();
     });
+}
+
+async function appRequest(ip: string, appId: string, method: 'GET' | 'POST' | 'DELETE'): Promise<number> {
+    return (await appRequestWithBody(ip, appId, method)).status;
+}
+
+/** State of an app: `running` it is started, `visible` it is in the foreground */
+export interface AppStatus {
+    running: boolean;
+    visible: boolean;
+}
+
+/**
+ * Ask the TV whether an app runs and is in the foreground.
+ *
+ * @param ip address of the TV
+ * @param appId ID under which this TV knows the app
+ * @returns the status, `null` if the TV does not answer or does not know the app
+ */
+export async function getAppStatus(ip: string, appId: string): Promise<AppStatus | null> {
+    const { status, body } = await appRequestWithBody(ip, appId, 'GET');
+    if (status !== 200) {
+        return null;
+    }
+    try {
+        const info = JSON.parse(body) as { running?: unknown; visible?: unknown };
+        return { running: info.running === true, visible: info.visible === true };
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * The app in the foreground, `''` if none of the given apps is.
+ *
+ * @param ip address of the TV
+ * @param apps the apps found on the TV
+ * @returns the key of the app, `null` if the TV does not answer
+ */
+export async function findVisibleApp(ip: string, apps: readonly InstalledApp[]): Promise<string | null> {
+    const states = await Promise.all(apps.map(app => getAppStatus(ip, app.appId)));
+    if (apps.length && states.every(state => state === null)) {
+        return null;
+    }
+    return apps.find((_app, i) => states[i]?.visible)?.key ?? '';
 }
 
 /**
@@ -109,4 +163,26 @@ export async function launchAppRest(ip: string, appId: string): Promise<void> {
     if (status < 200 || status >= 300) {
         throw new Error(`The TV refused to start the app (HTTP ${status})`);
     }
+}
+
+/**
+ * Close an app. The TV answers HTTP 500 for an app that does not run, so that is checked first.
+ *
+ * @param ip address of the TV
+ * @param appId ID under which this TV knows the app
+ * @returns `false` if the app did not run
+ */
+export async function closeAppRest(ip: string, appId: string): Promise<boolean> {
+    const state = await getAppStatus(ip, appId);
+    if (!state?.running) {
+        return false;
+    }
+    const status = await appRequest(ip, appId, 'DELETE');
+    if (status === 0) {
+        throw new TvNotAnsweringError();
+    }
+    if (status < 200 || status >= 300) {
+        throw new Error(`The TV refused to close the app (HTTP ${status})`);
+    }
+    return true;
 }

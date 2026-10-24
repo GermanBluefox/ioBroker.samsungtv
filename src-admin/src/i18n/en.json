@@ -44,5 +44,7 @@
     "custom_samsungtv_steps_text": "Edit as text",
     "custom_samsungtv_steps_list": "Edit with the list",
     "custom_samsungtv_steps_unknown": "The adapter does not know this step",
-    "custom_samsungtv_steps_play": "Play the scene now (also unsaved changes)"
+    "custom_samsungtv_steps_play": "Play the scene now (also unsaved changes)",
+    "custom_samsungtv_steps_close": "Close %s",
+    "custom_samsungtv_steps_hold": "Hold %s for %s s"
 }

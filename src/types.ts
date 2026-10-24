@@ -129,6 +129,8 @@ export interface RuntimeDevice extends ConfiguredDevice {
     appLookupRunning?: boolean;
     /** The Frame was woken and is being switched from Art Mode to TV, see `showTvAfterWake` */
     wakeTask?: Promise<void>;
+    /** Polls in a row the TV did not answer while it was online, see `OFFLINE_AFTER_FAILED_POLLS` */
+    failedPolls?: number;
 }
 
 /** A TV found by SSDP or mDNS and probed */

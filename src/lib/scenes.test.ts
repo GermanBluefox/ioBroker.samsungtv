@@ -27,6 +27,16 @@ describe('scenes', () => {
         assert.deepEqual(parseScene(' , pause 999999,,'), [{ type: 'wait', ms: 60000 }]);
     });
 
+    it('holds keys and closes apps', () => {
+        assert.deepEqual(parseScene('HOLD POWER 3000, hold key_home, close youtube, CLOSE Disney Plus'), [
+            { type: 'hold', key: 'KEY_POWER', ms: 3000 },
+            { type: 'hold', key: 'KEY_HOME', ms: 1000 },
+            { type: 'close', app: 'YOUTUBE' },
+            { type: 'close', app: 'DISNEY_PLUS' },
+        ]);
+        assert.throws(() => parseScene('CLOSE HDMI2'), /Unknown step "CLOSE HDMI2"/);
+    });
+
     it('switches the TV on with ON', () => {
         assert.deepEqual(parseScene('on, Power On, YOUTUBE'), [
             { type: 'on' },
@@ -56,8 +66,10 @@ describe('scenes', () => {
 
     it('runs the steps in order with the delay in between', async () => {
         const calls: string[] = [];
-        await runScene(parseScene('ON, HOME, YOUTUBE, WAIT 3000, HDMI1'), 700, {
+        await runScene(parseScene('ON, HOME, YOUTUBE, WAIT 3000, HDMI1, HOLD OK 1500, CLOSE YOUTUBE'), 700, {
             powerOn: () => Promise.resolve(void calls.push('on')),
+            holdKey: (key, ms) => Promise.resolve(void calls.push(`hold ${key} ${ms}`)),
+            closeApp: app => Promise.resolve(void calls.push(`close ${app}`)),
             sendKey: key => Promise.resolve(void calls.push(key)),
             launchApp: app => Promise.resolve(void calls.push(`app ${app}`)),
             selectInput: input => Promise.resolve(void calls.push(`input ${input}`)),
@@ -73,6 +85,10 @@ describe('scenes', () => {
             'sleep 3000',
             'sleep 700',
             'input HDMI1',
+            'sleep 700',
+            'hold KEY_ENTER 1500',
+            'sleep 700',
+            'close YOUTUBE',
         ]);
     });
 });

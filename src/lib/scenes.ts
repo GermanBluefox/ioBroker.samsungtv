@@ -10,6 +10,8 @@
  * - a pause: `WAIT 2000` (milliseconds)
  * - `ON`: switch the TV on and wait until it is on; only this step works while the TV is off, so a scene
  *   that starts with it can be started from standby
+ * - `CLOSE YOUTUBE`: close an app
+ * - `HOLD POWER 3000`: hold a key for the given ms (1000 if omitted)
  * separated by commas, semicolons or new lines; case and spaces do not matter.
  */
 import { TV_APPS, TV_INPUTS, TV_KEY_CODES } from './tvValues';
@@ -38,6 +40,8 @@ const MAX_WAIT = 60_000;
 export type SceneStep =
     | { type: 'on' }
     | { type: 'key'; key: string }
+    | { type: 'hold'; key: string; ms: number }
+    | { type: 'close'; app: string }
     | { type: 'app'; app: string }
     | { type: 'input'; input: string }
     | { type: 'wait'; ms: number };
@@ -51,6 +55,17 @@ export interface SceneConfig {
     steps: string;
     /** Pause between two steps in ms */
     delay?: number | string;
+}
+
+/** The Samsung key code of a key name, alias, digit or code; `null` if it is none */
+function keyCodeOf(name: string): string | null {
+    if (/^KEY_[A-Z0-9_]+$/.test(name)) {
+        return name;
+    }
+    if (/^\d$/.test(name)) {
+        return `KEY_${name}`;
+    }
+    return TV_KEY_CODES[name] ?? KEY_ALIASES[name] ?? null;
 }
 
 /**
@@ -71,17 +86,23 @@ export function parseScene(steps: string): SceneStep[] {
             result.push({ type: 'wait', ms: Math.min(Number(wait[1]), MAX_WAIT) });
             continue;
         }
+        const hold = /^HOLD (\S+?)(?: (\d+))?$/.exec(token);
+        const holdKey = hold ? keyCodeOf(hold[1]!) : null;
+        if (holdKey) {
+            result.push({ type: 'hold', key: holdKey, ms: Math.min(Number(hold![2] ?? 1000), MAX_WAIT) });
+            continue;
+        }
+        const close = /^CLOSE (.+)$/.exec(token)?.[1]?.replace(/ /g, '_');
+        if (close && TV_APPS[close]) {
+            result.push({ type: 'close', app: close });
+            continue;
+        }
         const name = token.replace(/ /g, '_');
+        const key = keyCodeOf(name);
         if (name === 'ON' || name === 'POWER_ON') {
             result.push({ type: 'on' });
-        } else if (/^KEY_[A-Z0-9_]+$/.test(name)) {
-            result.push({ type: 'key', key: name });
-        } else if (TV_KEY_CODES[name]) {
-            result.push({ type: 'key', key: TV_KEY_CODES[name] });
-        } else if (KEY_ALIASES[name]) {
-            result.push({ type: 'key', key: KEY_ALIASES[name] });
-        } else if (/^\d$/.test(name)) {
-            result.push({ type: 'key', key: `KEY_${name}` });
+        } else if (key) {
+            result.push({ type: 'key', key });
         } else if (TV_APPS[name]) {
             result.push({ type: 'app', app: name });
         } else if (TV_INPUTS[name]) {
@@ -111,6 +132,8 @@ export interface SceneRunner {
     /** Switch the TV on and resolve once it is on */
     powerOn: () => Promise<void>;
     sendKey: (key: string) => Promise<void>;
+    holdKey: (key: string, ms: number) => Promise<void>;
+    closeApp: (app: string) => Promise<void>;
     launchApp: (app: string) => Promise<void>;
     selectInput: (input: string) => Promise<void>;
     sleep: (ms: number) => Promise<void>;
@@ -132,6 +155,10 @@ export async function runScene(steps: SceneStep[], delay: number, runner: SceneR
             await runner.powerOn();
         } else if (step.type === 'key') {
             await runner.sendKey(step.key);
+        } else if (step.type === 'hold') {
+            await runner.holdKey(step.key, step.ms);
+        } else if (step.type === 'close') {
+            await runner.closeApp(step.app);
         } else if (step.type === 'app') {
             await runner.launchApp(step.app);
         } else if (step.type === 'input') {

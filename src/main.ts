@@ -12,7 +12,14 @@ import { XMLParser } from 'fast-xml-parser';
 import WebSocket from 'ws';
 
 import { type DeviceManagementService, SamsungTvDeviceManagement } from './lib/SamsungTvDeviceManagement';
-import { SAMSUNG_APPS, TvNotAnsweringError, findInstalledApps, launchAppRest } from './lib/apps';
+import {
+    SAMSUNG_APPS,
+    TvNotAnsweringError,
+    closeAppRest,
+    findInstalledApps,
+    findVisibleApp,
+    launchAppRest,
+} from './lib/apps';
 import { artChannelUrl, getArtMode, setArtMode } from './lib/artMode';
 import { SsdpClient } from './lib/discovery/SsdpClient';
 import { SamsungTv as SamsungHJ } from './lib/hj/SamsungTv';
@@ -114,6 +121,8 @@ const APP_LAUNCH_RETRY = 20000;
 const WOL_RETRY_INTERVAL = 10000;
 /** How long KEY_POWER is held to switch The Frame off instead of to Art Mode, in ms */
 const FRAME_POWER_OFF_HOLD = 3000;
+/** The REST API of The Frame does not answer for up to ~30 s while an app starts: offline only after this many polls */
+const OFFLINE_AFTER_FAILED_POLLS = 3;
 
 const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 const xmlParser = new XMLParser({ ignoreAttributes: false });
@@ -1013,7 +1022,14 @@ async function ensureDeviceObjects(device: RuntimeDevice): Promise<void> {
     // not media.mute: with its default role the type-detector takes a state as MUTE even if it is read-only,
     // and would control the TV through this mirror instead of control.muted
     await ensureState(`${base}.state.muted`, 'Muted', 'boolean', 'indicator', false, true);
-    await removeStateIfExists(`${base}.state.app`);
+    if (device.api === 'tizen') {
+        // not media.app: the type-detector would take this read-only state as the APP to control
+        await ensureState(`${base}.state.app`, 'App in the foreground', 'string', 'text', '', true, {
+            states: appStatesOf(device),
+        });
+    } else {
+        await removeStateIfExists(`${base}.state.app`);
+    }
     await removeStateIfExists(`${base}.state.source`);
 
     // The control channel is a `tv` of the type-detector: switch.power and media.key are required, the
@@ -1031,6 +1047,13 @@ async function ensureDeviceObjects(device: RuntimeDevice): Promise<void> {
     await ensureState(`${base}.control.launchApp`, 'Launch App', 'string', 'media.app', '', false, {
         states: appStatesOf(device),
     });
+    if (device.api === 'tizen') {
+        await ensureState(`${base}.control.closeApp`, 'Close App', 'string', 'text', '', false, {
+            states: appStatesOf(device),
+        });
+    } else {
+        await removeStateIfExists(`${base}.control.closeApp`);
+    }
     await ensureState(`${base}.control.source`, 'Source', 'string', 'media.input', '', false, {
         states: inputStatesOf(device),
     });
@@ -1261,6 +1284,14 @@ async function pollDevices(): Promise<void> {
 async function pollDevice(device: RuntimeDevice): Promise<void> {
     try {
         const status = await checkDeviceStatus(device);
+        if (!status.online && (await adapter.getStateAsync(`${device.name}.info.online`))?.val === true) {
+            device.failedPolls = (device.failedPolls ?? 0) + 1;
+            if (device.failedPolls < OFFLINE_AFTER_FAILED_POLLS) {
+                adapter.log.debug(`${device.name} does not answer (${device.failedPolls}), keeping its state for now`);
+                return;
+            }
+        }
+        device.failedPolls = 0;
         const audio = resolveAudioStates(device, status);
         await adapter.setStateAsync(`${device.name}.info.online`, status.online, true);
         await adapter.setStateAsync(`${device.name}.info.unreach`, !status.online, true);
@@ -1283,6 +1314,7 @@ async function pollDevice(device: RuntimeDevice): Promise<void> {
             );
         }
         await pollArtMode(device, status.online && status.power);
+        await pollVisibleApp(device, status.online && status.power);
         if (status.online && status.power && device.api === 'tizen' && !device.apps) {
             lookUpApps(device).catch(e =>
                 adapter.log.debug(`App lookup failed for ${device.name}: ${errorMessage(e)}`),
@@ -1290,6 +1322,17 @@ async function pollDevice(device: RuntimeDevice): Promise<void> {
         }
     } catch {
         // ignore
+    }
+}
+
+/** Read which of the found apps is in the foreground into `state.app` */
+async function pollVisibleApp(device: RuntimeDevice, on: boolean): Promise<void> {
+    if (device.api !== 'tizen' || !device.apps) {
+        return;
+    }
+    const app = on ? await findVisibleApp(device.ip, device.apps) : '';
+    if (app !== null) {
+        await adapter.setStateAsync(`${device.name}.state.app`, app, true);
     }
 }
 
@@ -1953,6 +1996,9 @@ async function handleMessage(command: string, message: JsonObject): Promise<unkn
         case 'launchApp':
             await launchAppOf(device, asString(message.app));
             return {};
+        case 'closeApp':
+            await closeAppOf(device, asString(message.app));
+            return {};
         case 'input':
             await selectSource(device, asString(message.input));
             return {};
@@ -2004,6 +2050,8 @@ async function runSceneSteps(
         adapter.log.debug(`Scene ${scene.name} on ${device.name}: ${scene.steps.length} steps`);
         await runScene(scene.steps, scene.delay, {
             powerOn: () => switchOnAndWait(device),
+            holdKey: (key, ms) => holdKey(device, key, ms),
+            closeApp: app => closeAppOf(device, app),
             sendKey: key => sendKey(device, key),
             launchApp: app => launchAppOf(device, app),
             selectInput: input => selectSource(device, input),
@@ -2091,6 +2139,12 @@ async function handleControl(
         case 'launchApp':
             if (typeof value === 'string' && value.trim()) {
                 await launchAppOf(device, value.trim());
+                await adapter.setStateAsync(id, '', true);
+            }
+            return;
+        case 'closeApp':
+            if (typeof value === 'string' && value.trim()) {
+                await closeAppOf(device, value.trim());
                 await adapter.setStateAsync(id, '', true);
             }
             return;
@@ -2382,22 +2436,30 @@ async function setPower(device: RuntimeDevice, on: boolean): Promise<void> {
             }
         }
         if (device.frameTv && device.api === 'tizen') {
-            // a short KEY_POWER only switches The Frame to Art Mode; held for 3 s it switches it off
-            await tizenSend(
-                device,
-                ['Press', 'Release'].map(Cmd => ({
-                    method: 'ms.remote.control',
-                    params: { Cmd, DataOfCmd: 'KEY_POWER', Option: 'false', TypeOfRemote: 'SendRemoteKey' },
-                })),
-                FRAME_POWER_OFF_HOLD,
-            );
-            markSeen(device);
+            // a short KEY_POWER may only switch The Frame to Art Mode; held for 3 s it switches it off
+            await holdKey(device, 'KEY_POWER', FRAME_POWER_OFF_HOLD);
             scheduleDevicePoll(device, 5000);
             return;
         }
         await sendKey(device, 'KEY_POWER');
         scheduleDevicePoll(device, 3000);
     }
+}
+
+/** Hold a key for `ms`; only Tizen TVs know press and release, the others get a click */
+async function holdKey(device: RuntimeDevice, key: string, ms: number): Promise<void> {
+    if (device.api !== 'tizen') {
+        return sendKey(device, key);
+    }
+    await tizenSend(
+        device,
+        ['Press', 'Release'].map(Cmd => ({
+            method: 'ms.remote.control',
+            params: { Cmd, DataOfCmd: key, Option: 'false', TypeOfRemote: 'SendRemoteKey' },
+        })),
+        ms,
+    );
+    markSeen(device);
 }
 
 /** Send the magic packet; logs where it went, never throws */
@@ -2663,6 +2725,24 @@ async function launchAppOf(device: RuntimeDevice, app: string): Promise<void> {
     }
     adapter.log.debug(`REST app launch failed on ${device.name} (${errorMessage(restError)}), trying the websocket`);
     await launchApp(device, appIds[0]!);
+}
+
+/** Close an app: a key of `TV_APPS` (`YOUTUBE`) or an app ID of the TV */
+async function closeAppOf(device: RuntimeDevice, app: string): Promise<void> {
+    if (device.api !== 'tizen') {
+        adapter.log.warn(`closeApp only supported for Tizen devices (${device.name})`);
+        return;
+    }
+    const key = app.toUpperCase();
+    const appId = TV_APPS[key] ? device.apps?.find(entry => entry.key === key)?.appId : app;
+    if (!appId) {
+        throw new Error(`${TV_APPS[key]} is not installed on ${device.name}`);
+    }
+    if (!(await closeAppRest(device.ip, appId))) {
+        adapter.log.debug(`${app} does not run on ${device.name}`);
+    }
+    markSeen(device);
+    scheduleDevicePoll(device, 1500);
 }
 
 /**

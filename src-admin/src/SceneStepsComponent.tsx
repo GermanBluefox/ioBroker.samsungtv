@@ -192,6 +192,11 @@ export default class SceneStepsComponent extends ConfigGeneric<ConfigGenericProp
         return [
             { value: 'ON', label: I18n.t('custom_samsungtv_steps_on'), group: group('power') },
             ...apps.map(key => ({ value: key, label: APPS[key] ?? key, group: group('apps') })),
+            ...apps.map(key => ({
+                value: `CLOSE ${key}`,
+                label: I18n.t('custom_samsungtv_steps_close', APPS[key] ?? key),
+                group: group('apps'),
+            })),
             ...inputs.map(key => ({ value: key, label: INPUTS[key] ?? key, group: group('inputs') })),
             ...Object.entries(KEYS).map(([value, label]) => ({ value, label, group: group('keys') })),
             ...WAITS.map(ms => ({
@@ -205,12 +210,21 @@ export default class SceneStepsComponent extends ConfigGeneric<ConfigGenericProp
     /** The label of a step for its chip, `null` if the adapter does not know it */
     labelOf(step: string, options: StepOption[]): string | null {
         const value = normalize(step);
-        const option = options.find(entry => entry.value === value);
+        const option = options.find(entry => normalize(entry.value) === value);
         if (option) {
             return option.label;
         }
         if (/^WAIT \d+$/.test(value)) {
             return I18n.t('custom_samsungtv_steps_wait', Number(value.slice(5)) / 1000);
+        }
+        const close = /^CLOSE_(.+)$/.exec(value)?.[1];
+        if (close && APPS[close]) {
+            return I18n.t('custom_samsungtv_steps_close', APPS[close]);
+        }
+        const hold = /^HOLD_(.+?)(?:_(\d+))?$/.exec(value);
+        if (hold) {
+            const key = options.find(entry => entry.value === hold[1])?.label ?? hold[1]!;
+            return I18n.t('custom_samsungtv_steps_hold', key, Number(hold[2] ?? 1000) / 1000);
         }
         if (/^KEY_[A-Z0-9_]+$/.test(value) || /^NUMBER_\d$/.test(value) || APPS[value] || INPUTS[value]) {
             return value;

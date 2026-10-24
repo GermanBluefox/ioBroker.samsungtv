@@ -66,9 +66,9 @@ Per TV:
     - `id`, `ip`, `mac`, `model`, `uuid`, `api`, `lastSeen`, `paired`, `online`, `unreach` (the inverse of `online`)
     - `tokenAuthSupport`
 - `samsungtv.0.<tvname>.state.*`
-    - `power`, `volume`, `muted`
+    - `power`, `volume`, `muted`, `app` (Tizen: the app in the foreground, e.g. `YOUTUBE`)
 - `samsungtv.0.<tvname>.control.*`
-    - `power`, `wol`, `key`, `home`, `volumeUp`, `volumeDown`, `mute`, `channelUp`, `channelDown`, `launchApp`, `source`
+    - `power`, `wol`, `key`, `home`, `volumeUp`, `volumeDown`, `mute`, `channelUp`, `channelDown`, `launchApp`, `closeApp`, `source`
     - `volume`, `muted`
     - `artMode` (only The Frame)
 - `samsungtv.0.<tvname>.scenes.*`: one button per scene of the **Scenes** tab
@@ -118,7 +118,7 @@ TV: press SOURCE on the remote control and write down the entries to the right o
 
 The **Scenes** tab holds named sequences, e.g. `HOME, YOUTUBE, WAIT 3000, OK` to open YouTube and confirm the
 account selection. A step is a key (`HOME`, `OK`, `1`, `KEY_...`), an app (`YOUTUBE`), an input (`HDMI2`) or a
-pause (`WAIT 2000`); the pause between two steps is configurable. A scene runs only while the TV is on,
+pause (`WAIT 2000`), `CLOSE YOUTUBE` or a held key (`HOLD POWER 3000`); the pause between two steps is configurable. A scene runs only while the TV is on,
 unless it begins with `ON`, which switches the TV on and waits for it, e.g. `ON, YOUTUBE`. In the settings the
 steps are picked from a list (switching on, keys, the apps and inputs of the TV, pauses) or typed as text. A scene belongs to one TV or to all of them and
 is started with its button `samsungtv.0.<tvname>.scenes.<name>` or from the **Remote control** tab.
@@ -185,6 +185,7 @@ Note: not every TV supports every key. Some keys only work when a menu/focus is 
 - (@GermanBluefox) Switch Tizen TVs on with Wake-on-LAN first; switch The Frame off instead of to Art Mode.
 - (@GermanBluefox) Send Wake-on-LAN to the broadcast address of every network interface, not only to 255.255.255.255, and log it.
 - (@GermanBluefox) The Frame: switching on and Art Mode off show TV with the last input; add `control.home`; token TVs use port 8002 first.
+- (@GermanBluefox) `state.app`, `control.closeApp`, scene steps `CLOSE` and `HOLD`; a TV is offline only after 3 unanswered polls.
 - (@GermanBluefox) Add `info.unreach`; `state.muted` gets the role `indicator`, `state.volume` a range, so the type-detector finds the right states.
 
 ### 0.0.28

@@ -44,5 +44,7 @@
     "custom_samsungtv_steps_text": "Редактировать как текст",
     "custom_samsungtv_steps_list": "Редактировать списком",
     "custom_samsungtv_steps_unknown": "Адаптер не знает этот шаг",
-    "custom_samsungtv_steps_play": "Воспроизвести сцену сейчас (также несохранённые изменения)"
+    "custom_samsungtv_steps_play": "Воспроизвести сцену сейчас (также несохранённые изменения)",
+    "custom_samsungtv_steps_close": "Закрыть %s",
+    "custom_samsungtv_steps_hold": "Удерживать %s %s с"
 }

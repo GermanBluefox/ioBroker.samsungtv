@@ -44,5 +44,7 @@
     "custom_samsungtv_steps_text": "Modifica come testo",
     "custom_samsungtv_steps_list": "Modifica con l'elenco",
     "custom_samsungtv_steps_unknown": "L'adattatore non conosce questo passo",
-    "custom_samsungtv_steps_play": "Riproduci la scena ora (anche modifiche non salvate)"
+    "custom_samsungtv_steps_play": "Riproduci la scena ora (anche modifiche non salvate)",
+    "custom_samsungtv_steps_close": "Chiudi %s",
+    "custom_samsungtv_steps_hold": "Tieni premuto %s per %s s"
 }

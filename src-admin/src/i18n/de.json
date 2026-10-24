@@ -44,5 +44,7 @@
     "custom_samsungtv_steps_text": "Als Text bearbeiten",
     "custom_samsungtv_steps_list": "Mit der Liste bearbeiten",
     "custom_samsungtv_steps_unknown": "Diesen Schritt kennt der Adapter nicht",
-    "custom_samsungtv_steps_play": "Szene jetzt abspielen (auch ungespeicherte Änderungen)"
+    "custom_samsungtv_steps_play": "Szene jetzt abspielen (auch ungespeicherte Änderungen)",
+    "custom_samsungtv_steps_close": "%s schließen",
+    "custom_samsungtv_steps_hold": "%s %s s gedrückt halten"
 }

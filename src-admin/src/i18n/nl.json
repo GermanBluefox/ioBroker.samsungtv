@@ -44,5 +44,7 @@
     "custom_samsungtv_steps_text": "Als tekst bewerken",
     "custom_samsungtv_steps_list": "Met de lijst bewerken",
     "custom_samsungtv_steps_unknown": "De adapter kent deze stap niet",
-    "custom_samsungtv_steps_play": "Scène nu afspelen (ook niet-opgeslagen wijzigingen)"
+    "custom_samsungtv_steps_play": "Scène nu afspelen (ook niet-opgeslagen wijzigingen)",
+    "custom_samsungtv_steps_close": "%s sluiten",
+    "custom_samsungtv_steps_hold": "%s %s s ingedrukt houden"
 }
