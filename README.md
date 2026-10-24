@@ -201,7 +201,7 @@ Note: not every TV supports every key. Some keys only work when a menu/focus is 
 - (@GermanBluefox) Send Wake-on-LAN to the broadcast address of every network interface, not only to 255.255.255.255, and log it.
 - (@GermanBluefox) The Frame: switching on and Art Mode off show TV with the last input; add `control.home`; token TVs use port 8002 first.
 - (@GermanBluefox) Keep the remote and art channels of a Tizen TV open while it is on: faster keys, Art Mode, artwork, off and power cuts are seen at once.
-- (@GermanBluefox) Play YouTube videos, playlists and channels with `control.youtube` and the scene step `YOUTUBE:`, see [YouTube](#youtube).
+- (@GermanBluefox) Play YouTube videos, playlists and channels with `control.youtube` and the scene step `YOUTUBE:`, see [YouTube](#youtube) (with `@iobroker/youtube-lounge`).
 - (@GermanBluefox) `state.app`, `state.artwork`, `control.closeApp`, scene steps `CLOSE` and `HOLD`; a TV is offline only after 3 unanswered polls.
 - (@GermanBluefox) Add `info.unreach`; `state.muted` gets the role `indicator`, `state.volume` a range, so the type-detector finds the right states.
 

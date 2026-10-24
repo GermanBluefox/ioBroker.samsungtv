@@ -16,7 +16,7 @@
  * separated by commas, semicolons or new lines; case and spaces do not matter.
  */
 import { TV_APPS, TV_INPUTS, TV_KEY_CODES } from './tvValues';
-import { parseYouTubeTarget } from './youtubeLounge';
+import { parseYouTubeTarget } from '@iobroker/youtube-lounge';
 
 /** Short names a user is likely to type, in addition to the keys of `TV_KEYS` */
 const KEY_ALIASES: Readonly<Record<string, string>> = {

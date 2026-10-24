@@ -30,7 +30,7 @@ import { acceptPowerUpdate, startPowerTransition } from './lib/powerTransitionTo
 import { boundedSeconds } from './lib/timerTools';
 import { type ChannelMessage, PersistentChannel, reconnectDelay } from './lib/persistentChannel';
 import { parseScene, runScene, sceneDelay, sceneId, type SceneStep } from './lib/scenes';
-import { YouTubeLounge, YouTubeSessionError, getScreenIdFromDial, parseYouTubeTarget } from './lib/youtubeLounge';
+import { YouTubeLounge, getYouTubeScreenId, parseYouTubeTarget, readDialDevice } from '@iobroker/youtube-lounge';
 import { SOURCE_MENU_DELAY, SOURCE_MENU_KEY_GAP, parseSourceMenu, sourceMenuKeys } from './lib/sourceMenu';
 import { evaluateTizenTokenMessage } from './lib/tizenTokenTools';
 import { wakeOnLan } from './lib/wakeOnLan';
@@ -2895,7 +2895,7 @@ const youtubeSessions = new Map<string, YouTubeLounge>();
 
 /**
  * Play a video, playlist or the uploads of a channel in the YouTube app, or send play / pause / next / previous.
- * Goes over the YouTube Lounge API of Google, the only way the TV accepts; see `youtubeLounge.ts`.
+ * Goes over the YouTube Lounge API of Google (`@iobroker/youtube-lounge`), the only way the TV accepts.
  */
 async function playYouTube(device: RuntimeDevice, input: string): Promise<void> {
     if (device.api !== 'tizen') {
@@ -2903,36 +2903,29 @@ async function playYouTube(device: RuntimeDevice, input: string): Promise<void> 
     }
     const target = parseYouTubeTarget(input);
     let lounge = youtubeSessions.get(device.id);
-    if (!lounge?.paired) {
-        lounge = new YouTubeLounge('ioBroker');
-        await lounge.pair(await youtubeScreenId(device));
+    if (!lounge?.screen) {
+        lounge = new YouTubeLounge({ name: 'ioBroker' });
+        await lounge.pairWithScreenId(await youtubeScreenId(device));
         youtubeSessions.set(device.id, lounge);
     }
-    try {
-        await lounge.play(target);
-    } catch (e) {
-        if (!(e instanceof YouTubeSessionError)) {
-            throw e;
-        }
-        // session or token expired: once again from the start
-        if (!lounge.paired) {
-            await lounge.pair(await youtubeScreenId(device));
-        }
-        await lounge.play(target);
-    }
+    // an expired token or session is renewed by the lounge itself
+    await lounge.play(target);
     adapter.log.debug(`YouTube on ${device.name}: ${target.kind}`);
     markSeen(device);
 }
 
 /** The screen of the YouTube app; the app reports it over DIAL, so it is started if it does not answer */
 async function youtubeScreenId(device: RuntimeDevice): Promise<string> {
-    let screenId = await getScreenIdFromDial(device.ip);
+    // the DIAL description of Samsung TVs names the app URL; port 8080 if it does not answer
+    const appUrl =
+        (await readDialDevice(`http://${device.ip}:7678/nservice/`))?.appUrl ?? `http://${device.ip}:8080/ws/app/`;
+    let screenId = await getYouTubeScreenId(appUrl);
     for (let attempt = 0; !screenId && attempt < 5; attempt++) {
         if (attempt === 0) {
             await launchAppOf(device, 'YOUTUBE');
         }
         await sleep(2000);
-        screenId = await getScreenIdFromDial(device.ip);
+        screenId = await getYouTubeScreenId(appUrl);
     }
     if (!screenId) {
         throw new Error(`The YouTube app of ${device.name} does not report its screen`);
