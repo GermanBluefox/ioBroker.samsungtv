@@ -66,7 +66,7 @@ Per TV:
     - `id`, `ip`, `mac`, `model`, `uuid`, `api`, `lastSeen`, `paired`, `online`, `unreach` (the inverse of `online`)
     - `tokenAuthSupport`
 - `samsungtv.0.<tvname>.state.*`
-    - `power`, `volume`, `muted`, `app` (Tizen: the app in the foreground, e.g. `YOUTUBE`)
+    - `power`, `volume`, `muted`, `app` (Tizen: the app in the foreground, e.g. `YOUTUBE`), `artwork` (The Frame: the shown artwork, e.g. `MY_F0003`)
 - `samsungtv.0.<tvname>.control.*`
     - `power`, `wol`, `key`, `home`, `volumeUp`, `volumeDown`, `mute`, `channelUp`, `channelDown`, `launchApp`, `closeApp`, `source`
     - `volume`, `muted`
@@ -185,7 +185,7 @@ Note: not every TV supports every key. Some keys only work when a menu/focus is 
 - (@GermanBluefox) Switch Tizen TVs on with Wake-on-LAN first; switch The Frame off instead of to Art Mode.
 - (@GermanBluefox) Send Wake-on-LAN to the broadcast address of every network interface, not only to 255.255.255.255, and log it.
 - (@GermanBluefox) The Frame: switching on and Art Mode off show TV with the last input; add `control.home`; token TVs use port 8002 first.
-- (@GermanBluefox) `state.app`, `control.closeApp`, scene steps `CLOSE` and `HOLD`; a TV is offline only after 3 unanswered polls.
+- (@GermanBluefox) `state.app`, `state.artwork`, `control.closeApp`, scene steps `CLOSE` and `HOLD`; a TV is offline only after 3 unanswered polls.
 - (@GermanBluefox) Add `info.unreach`; `state.muted` gets the role `indicator`, `state.volume` a range, so the type-detector finds the right states.
 
 ### 0.0.28

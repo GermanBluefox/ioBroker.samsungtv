@@ -223,7 +223,7 @@ export default class SceneStepsComponent extends ConfigGeneric<ConfigGenericProp
         }
         const hold = /^HOLD_(.+?)(?:_(\d+))?$/.exec(value);
         if (hold) {
-            const key = options.find(entry => entry.value === hold[1])?.label ?? hold[1]!;
+            const key = options.find(entry => entry.value === hold[1])?.label ?? String(hold[1]);
             return I18n.t('custom_samsungtv_steps_hold', key, Number(hold[2] ?? 1000) / 1000);
         }
         if (/^KEY_[A-Z0-9_]+$/.test(value) || /^NUMBER_\d$/.test(value) || APPS[value] || INPUTS[value]) {

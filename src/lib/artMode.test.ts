@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { after, before, describe, it } from 'mocha';
 import type WebSocket from 'ws';
 import { WebSocketServer } from 'ws';
-import { getArtMode, setArtMode } from './artMode';
+import { getArtMode, getCurrentArtwork, setArtMode } from './artMode';
 
 /**
  * A fake art channel that answers like The Frame 2022: the answer is named like the request and carries
@@ -27,7 +27,14 @@ function startFakeTv(state: { artMode: boolean; sendReady: boolean }): Promise<W
                     request_id: string;
                     value?: string;
                 };
-                if (request.request === 'get_artmode_status') {
+                if (request.request === 'get_current_artwork') {
+                    emit({
+                        event: 'get_current_artwork',
+                        request_id: request.request_id,
+                        content_id: 'MY_F0003',
+                        matte_id: 'shadowbox_polar',
+                    });
+                } else if (request.request === 'get_artmode_status') {
                     emit({
                         event: 'get_artmode_status',
                         request_id: request.request_id,
@@ -76,6 +83,10 @@ describe('Art Mode', () => {
         state.artMode = false;
         assert.equal(await setArtMode(url, true), true);
         assert.equal(state.artMode, true);
+    });
+
+    it('reads the current artwork', async () => {
+        assert.deepEqual(await getCurrentArtwork(url), { contentId: 'MY_F0003', matteId: 'shadowbox_polar' });
     });
 
     it('sends the request after ms.channel.connect if the TV sends no ms.channel.ready', async () => {

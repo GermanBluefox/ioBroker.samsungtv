@@ -20,7 +20,7 @@ import {
     findVisibleApp,
     launchAppRest,
 } from './lib/apps';
-import { artChannelUrl, getArtMode, setArtMode } from './lib/artMode';
+import { artChannelUrl, getArtMode, getCurrentArtwork, setArtMode } from './lib/artMode';
 import { SsdpClient } from './lib/discovery/SsdpClient';
 import { SamsungTv as SamsungHJ } from './lib/hj/SamsungTv';
 import { LegacyRemote } from './lib/legacy/LegacyRemote';
@@ -1065,8 +1065,10 @@ async function ensureDeviceObjects(device: RuntimeDevice): Promise<void> {
     await ensureState(`${base}.control.muted`, 'Muted', 'boolean', 'media.mute', false, false);
     if (device.frameTv) {
         await ensureState(`${base}.control.artMode`, 'Art Mode', 'boolean', 'switch.mode.art', false, false);
+        await ensureState(`${base}.state.artwork`, 'Artwork', 'string', 'text', '', true);
     } else {
         await removeStateIfExists(`${base}.control.artMode`);
+        await removeStateIfExists(`${base}.state.artwork`);
     }
     await ensureSceneStates(device);
 }
@@ -1357,6 +1359,14 @@ async function pollArtMode(device: RuntimeDevice, on: boolean): Promise<void> {
         }
     }
     await adapter.setStateAsync(`${device.name}.control.artMode`, artMode, true);
+    if (on) {
+        try {
+            const artwork = await getCurrentArtwork(artChannelUrl(device.ip, tizenTokenOf(device)));
+            await adapter.setStateAsync(`${device.name}.state.artwork`, artwork.contentId, true);
+        } catch (e) {
+            adapter.log.debug(`Artwork of ${device.name} not readable: ${errorMessage(e)}`);
+        }
+    }
 }
 
 /** Switch the Art Mode; the poll leaves `control.artMode` alone meanwhile, the TV reports the old value */

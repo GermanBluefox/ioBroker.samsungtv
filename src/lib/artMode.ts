@@ -32,6 +32,16 @@ interface ArtEvent {
     value?: unknown;
     status?: unknown;
     error_code?: unknown;
+    content_id?: unknown;
+    matte_id?: unknown;
+}
+
+/** The artwork The Frame shows */
+export interface Artwork {
+    /** e.g. `MY_F0003` (own picture) or `SAM-S…` (Art Store) */
+    contentId: string;
+    /** Passe-partout, e.g. `shadowbox_polar`, `none` */
+    matteId: string;
 }
 
 function parseArtEvent(raw: WebSocket.RawData): ArtEvent | null {
@@ -184,6 +194,24 @@ export function getArtMode(url: string): Promise<boolean> {
         'get_artmode_status',
         {},
         (data, requestId) => ((data.request_id ?? data.id) === requestId ? (artValue(data) ?? undefined) : undefined),
+        REQUEST_TIMEOUT,
+    );
+}
+
+/**
+ * Read the artwork The Frame shows (or would show in Art Mode).
+ *
+ * @param url URL of the art channel, see `artChannelUrl`
+ */
+export function getCurrentArtwork(url: string): Promise<Artwork> {
+    return artRequest(
+        url,
+        'get_current_artwork',
+        {},
+        (data, requestId) =>
+            (data.request_id ?? data.id) === requestId && typeof data.content_id === 'string'
+                ? { contentId: data.content_id, matteId: typeof data.matte_id === 'string' ? data.matte_id : '' }
+                : undefined,
         REQUEST_TIMEOUT,
     );
 }
