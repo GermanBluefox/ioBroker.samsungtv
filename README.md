@@ -115,6 +115,7 @@ TV: press SOURCE on the remote control and write down the entries to the right o
 `TV, HDMI2, USB`. Only connected inputs are shown there, so update the order when you connect a device.
 
 ### Open connection
+
 While a paired Tizen TV is on, the adapter keeps its remote channel (and the art channel of The Frame) open. Keys go
 out without a new connection, and the TV reports Art Mode, a new picture, standby, off and power cuts at once
 instead of at the next poll. Without a token the adapter never connects on its own, as the TV would ask to allow
