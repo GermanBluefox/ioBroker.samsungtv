@@ -131,6 +131,8 @@ export interface RuntimeDevice extends ConfiguredDevice {
     wakeTask?: Promise<void>;
     /** Polls in a row the TV did not answer while it was online, see `OFFLINE_AFTER_FAILED_POLLS` */
     failedPolls?: number;
+    /** The TV closed the open remote channel: off or power cut, the next unanswered poll counts */
+    channelLost?: boolean;
 }
 
 /** A TV found by SSDP or mDNS and probed */

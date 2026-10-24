@@ -28,6 +28,7 @@ import { shouldMigrateLegacySamsung } from './lib/legacyMigrationTools';
 import { getPingArguments, normalizeMac, parseArpTable, parseMacFromArpOutput } from './lib/networkTools';
 import { acceptPowerUpdate, startPowerTransition } from './lib/powerTransitionTools';
 import { boundedSeconds } from './lib/timerTools';
+import { type ChannelMessage, PersistentChannel, reconnectDelay } from './lib/persistentChannel';
 import { parseScene, runScene, sceneDelay, sceneId, type SceneStep } from './lib/scenes';
 import { YouTubeLounge, YouTubeSessionError, getScreenIdFromDial, parseYouTubeTarget } from './lib/youtubeLounge';
 import { SOURCE_MENU_DELAY, SOURCE_MENU_KEY_GAP, parseSourceMenu, sourceMenuKeys } from './lib/sourceMenu';
@@ -151,6 +152,18 @@ let upnpNotifyPort = 0;
 const upnpSubscriptionsByDeviceId = new Map<string, UpnpSubscription>(); // deviceId -> { sid, eventUrl, renewTimer, expiresAt }
 const upnpSidToDeviceId = new Map<string, string>(); // sid -> deviceId
 
+/** The channels kept open to a TV while it is on */
+interface DeviceChannels {
+    remote?: PersistentChannel;
+    art?: PersistentChannel;
+    failures: number;
+    nextAttempt: number;
+    /** The TV refused the token; no new attempt before pairing anew */
+    unauthorized: boolean;
+}
+
+const channelsByDevice = new Map<string, DeviceChannels>();
+
 /** The value as a string, or an empty string for anything else */
 function asString(value: unknown): string {
     return typeof value === 'string' ? value : '';
@@ -208,6 +221,9 @@ async function onUnload(callback: () => void): Promise<void> {
         }
         cleanupUpnpSubscriptions();
         stopUpnpNotifyServer();
+        for (const device of devicesById.values()) {
+            closeChannels(device);
+        }
         callback();
     } catch {
         callback();
@@ -643,6 +659,7 @@ async function setManagedTizenToken(device: AnyDevice, token: string): Promise<v
 
 async function storeManagedTizenToken(device: AnyDevice, token: string): Promise<void> {
     await setInMemoryToken(device.id, token);
+    channelsByDevice.delete(device.id);
     if (device.api !== 'tizen') {
         device.api = 'tizen';
         for (const raw of configuredDevicesRaw) {
@@ -1292,12 +1309,13 @@ async function pollDevice(device: RuntimeDevice): Promise<void> {
         const status = await checkDeviceStatus(device);
         if (!status.online && (await adapter.getStateAsync(`${device.name}.info.online`))?.val === true) {
             device.failedPolls = (device.failedPolls ?? 0) + 1;
-            if (device.failedPolls < OFFLINE_AFTER_FAILED_POLLS) {
+            if (!device.channelLost && device.failedPolls < OFFLINE_AFTER_FAILED_POLLS) {
                 adapter.log.debug(`${device.name} does not answer (${device.failedPolls}), keeping its state for now`);
                 return;
             }
         }
         device.failedPolls = 0;
+        device.channelLost = false;
         const audio = resolveAudioStates(device, status);
         await adapter.setStateAsync(`${device.name}.info.online`, status.online, true);
         await adapter.setStateAsync(`${device.name}.info.unreach`, !status.online, true);
@@ -1319,6 +1337,9 @@ async function pollDevice(device: RuntimeDevice): Promise<void> {
                 adapter.log.debug(`UPnP subscribe failed for ${device.name}: ${errorMessage(e)}`),
             );
         }
+        maintainChannels(device, status.online && status.power).catch(e =>
+            adapter.log.debug(`Channels of ${device.name}: ${errorMessage(e)}`),
+        );
         await pollArtMode(device, status.online && status.power);
         await pollVisibleApp(device, status.online && status.power);
         if (status.online && status.power && device.api === 'tizen' && !device.apps) {
@@ -1328,6 +1349,98 @@ async function pollDevice(device: RuntimeDevice): Promise<void> {
         }
     } catch {
         // ignore
+    }
+}
+
+/**
+ * Keep the remote channel (and the art channel of The Frame) open while the TV is on, close them when it is off.
+ * Never without a token: the TV would ask the user to allow the connection.
+ */
+async function maintainChannels(device: RuntimeDevice, on: boolean): Promise<void> {
+    if (device.api !== 'tizen') {
+        return;
+    }
+    if (!on) {
+        closeChannels(device);
+        return;
+    }
+    let entry = channelsByDevice.get(device.id);
+    if (!entry) {
+        entry = { failures: 0, nextAttempt: 0, unauthorized: false };
+        channelsByDevice.set(device.id, entry);
+    }
+    const token = tizenTokenOf(device);
+    if (entry.unauthorized || (!token && device.tokenAuthSupport !== false) || Date.now() < entry.nextAttempt) {
+        return;
+    }
+    try {
+        if (!entry.remote?.connected) {
+            entry.remote = openChannel(device, entry, buildTizenWsCandidates(device, token, ['v2'])[0]!);
+            await entry.remote.connect();
+            adapter.log.debug(`Remote channel of ${device.name} open`);
+        }
+        if (device.frameTv && !entry.art?.connected) {
+            entry.art = openChannel(device, entry, artChannelUrl(device.ip, token));
+            await entry.art.connect();
+            adapter.log.debug(`Art channel of ${device.name} open`);
+        }
+        entry.failures = 0;
+    } catch (e) {
+        entry.failures++;
+        entry.nextAttempt = Date.now() + reconnectDelay(entry.failures);
+        adapter.log.debug(`Channel of ${device.name} not open (${errorMessage(e)}), next attempt later`);
+    }
+}
+
+function openChannel(device: RuntimeDevice, entry: DeviceChannels, url: string): PersistentChannel {
+    const channel = new PersistentChannel(url);
+    channel.on('close', ({ intentional }: { intentional: boolean }) => {
+        if (!intentional && !isUnloading) {
+            // off or power cut: look now instead of at the next poll
+            device.channelLost = true;
+            adapter.log.debug(`${device.name} closed a channel`);
+            scheduleDevicePoll(device, 1000);
+        }
+    });
+    channel.on('unauthorized', () => {
+        entry.unauthorized = true;
+        adapter.log.warn(`${device.name} refused the token, please pair again`);
+    });
+    channel.on('message', (message: ChannelMessage) => {
+        handleArtEvent(device, message).catch(e =>
+            adapter.log.debug(`Art event of ${device.name}: ${errorMessage(e)}`),
+        );
+    });
+    return channel;
+}
+
+/** Events of the art channel: Art Mode switched, another picture, standby */
+async function handleArtEvent(device: RuntimeDevice, message: ChannelMessage): Promise<void> {
+    if (message.event !== 'd2d_service_message' || !message.data || typeof message.data !== 'object') {
+        return;
+    }
+    const data = message.data as { event?: string; value?: unknown; status?: unknown; content_id?: unknown };
+    if (data.event === 'art_mode_changed' && !(device.artSwitchUntil && Date.now() < device.artSwitchUntil)) {
+        const value = data.value ?? data.status;
+        if (typeof value === 'string') {
+            await adapter.setStateAsync(`${device.name}.control.artMode`, value.toLowerCase() === 'on', true);
+        }
+    } else if (
+        (data.event === 'image_selected' || data.event === 'slideshow_image_changed') &&
+        typeof data.content_id === 'string'
+    ) {
+        await adapter.setStateAsync(`${device.name}.state.artwork`, data.content_id, true);
+    } else if (data.event === 'go_to_standby') {
+        scheduleDevicePoll(device, 2000);
+    }
+}
+
+function closeChannels(device: RuntimeDevice): void {
+    const entry = channelsByDevice.get(device.id);
+    entry?.remote?.close();
+    entry?.art?.close();
+    if (entry) {
+        entry.remote = entry.art = undefined;
     }
 }
 
@@ -2888,6 +3001,20 @@ async function tizenSend(device: RuntimeDevice, payload: JsonObject | JsonObject
     const token = tokenRaw === NO_TOKEN ? '' : tokenRaw;
     if (device.tokenAuthSupport === true && !token) {
         throw new Error('Not paired (Tizen)');
+    }
+    const channel = channelsByDevice.get(device.id)?.remote;
+    if (channel?.connected) {
+        try {
+            for (const [i, message] of (Array.isArray(payload) ? payload : [payload]).entries()) {
+                if (i) {
+                    await sleep(gap ?? WS_SEND_DELAY);
+                }
+                channel.send(message);
+            }
+            return;
+        } catch (e) {
+            adapter.log.debug(`Open channel of ${device.name} failed (${errorMessage(e)}), connecting anew`);
+        }
     }
     const urlCandidates = buildTizenWsCandidates(device, token, ['v2', 'v3']);
     let lastError: Error | undefined;
