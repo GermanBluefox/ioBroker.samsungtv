@@ -73,15 +73,18 @@ export function broadcastAddresses(
  * @param options.repeat how often the packet is sent, 3 by default
  * @param options.interval pause between two repetitions in ms, 100 by default
  * @param options.addresses where to send it; all broadcast addresses of the host by default
+ * @param options.ip address of the device: the packet goes there first. The Frame 2022 in deep standby over WLAN
+ *   ignored broadcasts but woke up on a packet to its address
  * @returns the addresses the packet was sent to
  */
 export async function wakeOnLan(
     mac: string,
-    options: { port?: number; repeat?: number; interval?: number; addresses?: string[] } = {},
+    options: { port?: number; repeat?: number; interval?: number; addresses?: string[]; ip?: string } = {},
 ): Promise<string[]> {
     const { port = 9, repeat = 3, interval = 100 } = options;
     const packet = createMagicPacket(mac);
-    const targets = options.addresses?.length ? options.addresses : broadcastAddresses();
+    const broadcasts = options.addresses?.length ? options.addresses : broadcastAddresses();
+    const targets = options.ip ? [options.ip, ...broadcasts.filter(address => address !== options.ip)] : broadcasts;
     const socket = dgram.createSocket('udp4');
     try {
         await new Promise<void>((resolve, reject) => {

@@ -45,6 +45,14 @@ describe('Wake-on-LAN', () => {
             await new Promise(resolve => setTimeout(resolve, 50));
             assert.deepEqual(targets, ['127.0.0.1']);
             assert.equal(received.length, 2);
+            // the address of the device comes first, the broadcasts follow
+            const both = await wakeOnLan('1c:86:9a:69:a2:fa', {
+                port,
+                repeat: 1,
+                addresses: ['127.255.255.255'],
+                ip: '127.0.0.1',
+            });
+            assert.deepEqual(both, ['127.0.0.1', '127.255.255.255']);
             assert.deepEqual(received[0], createMagicPacket('1c:86:9a:69:a2:fa'));
         } finally {
             receiver.close();

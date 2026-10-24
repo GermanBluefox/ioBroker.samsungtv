@@ -2627,7 +2627,7 @@ async function holdKey(device: RuntimeDevice, key: string, ms: number): Promise<
 
 /** Send the magic packet; logs where it went, never throws */
 function sendWol(device: RuntimeDevice): void {
-    wakeOnLan(device.mac)
+    wakeOnLan(device.mac, { ip: device.ip || undefined })
         .then(targets =>
             adapter.log.info(`Wake-on-LAN for ${device.name} (${device.mac}) sent to ${targets.join(', ')}`),
         )
