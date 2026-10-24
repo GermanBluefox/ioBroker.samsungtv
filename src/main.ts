@@ -147,6 +147,8 @@ let registryDirty = false;
 let pollIntervalMs = 30000;
 let scanIntervalMs = 300000;
 let isUnloading = false;
+/** Lounge sessions with the YouTube app, per TV */
+const youtubeSessions = new Map<string, YouTubeLounge>();
 let upnpNotifyServer: http.Server | null = null;
 let upnpNotifyPort = 0;
 const upnpSubscriptionsByDeviceId = new Map<string, UpnpSubscription>(); // deviceId -> { sid, eventUrl, renewTimer, expiresAt }
@@ -225,6 +227,9 @@ async function onUnload(callback: () => void): Promise<void> {
         stopUpnpNotifyServer();
         for (const device of devicesById.values()) {
             closeChannels(device);
+        }
+        for (const lounge of youtubeSessions.values()) {
+            lounge.close();
         }
         callback();
     } catch {
@@ -2890,9 +2895,6 @@ async function launchAppOf(device: RuntimeDevice, app: string): Promise<void> {
     await launchApp(device, appIds[0]!);
 }
 
-/** Lounge sessions with the YouTube app, per TV */
-const youtubeSessions = new Map<string, YouTubeLounge>();
-
 /**
  * Play a video, playlist or the uploads of a channel in the YouTube app, or send play / pause / next / previous.
  * Goes over the YouTube Lounge API of Google (`@iobroker/youtube-lounge`), the only way the TV accepts.
@@ -2907,6 +2909,13 @@ async function playYouTube(device: RuntimeDevice, input: string): Promise<void> 
         lounge = new YouTubeLounge({ name: 'ioBroker' });
         await lounge.pairWithScreenId(await youtubeScreenId(device));
         youtubeSessions.set(device.id, lounge);
+    }
+    // Google takes commands also while the app is not open, and they get lost
+    if (!(await lounge.waitForScreen(3000))) {
+        await launchAppOf(device, 'YOUTUBE');
+        if (!(await lounge.waitForScreen(30_000))) {
+            throw new Error(`The YouTube app of ${device.name} did not open`);
+        }
     }
     // an expired token or session is renewed by the lounge itself
     await lounge.play(target);

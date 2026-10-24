@@ -128,7 +128,8 @@ it; if the TV refuses the token, it waits for a new pairing.
 in the YouTube app of a Tizen TV, and also takes `play`, `pause`, `next` and `previous`. It uses the YouTube Lounge API
 ("Link with TV"), so these commands go over Google's servers - the TV accepts no other way. The adapter reads the
 screen of the YouTube app locally over DIAL (and starts the app for that if needed); the lounge token is kept in
-memory only. Handles (`@name`) cannot be resolved without the YouTube Data API.
+memory only. The command is sent once the app is open (it is started, waiting up to 30 s), so a scene
+`ON, YOUTUBE:UC…` works right after switching on. Handles (`@name`) cannot be resolved without the YouTube Data API.
 
 ### Scenes
 
