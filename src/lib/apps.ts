@@ -87,6 +87,14 @@ export async function findInstalledApps(ip: string): Promise<InstalledApp[] | nu
     return answered ? found.filter((app): app is InstalledApp => !!app) : null;
 }
 
+/** The REST API of the TV does not answer at all, e.g. a few seconds after waking up */
+export class TvNotAnsweringError extends Error {
+    constructor() {
+        super('The TV does not answer. Is it switched on?');
+        this.name = 'TvNotAnsweringError';
+    }
+}
+
 /**
  * Start an app with the REST API.
  *
@@ -96,7 +104,7 @@ export async function findInstalledApps(ip: string): Promise<InstalledApp[] | nu
 export async function launchAppRest(ip: string, appId: string): Promise<void> {
     const status = await appRequest(ip, appId, 'POST');
     if (status === 0) {
-        throw new Error('The TV does not answer. Is it switched on?');
+        throw new TvNotAnsweringError();
     }
     if (status < 200 || status >= 300) {
         throw new Error(`The TV refused to start the app (HTTP ${status})`);

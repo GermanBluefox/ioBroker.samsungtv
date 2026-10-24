@@ -12,7 +12,7 @@ import { XMLParser } from 'fast-xml-parser';
 import WebSocket from 'ws';
 
 import { type DeviceManagementService, SamsungTvDeviceManagement } from './lib/SamsungTvDeviceManagement';
-import { SAMSUNG_APPS, findInstalledApps, launchAppRest } from './lib/apps';
+import { SAMSUNG_APPS, TvNotAnsweringError, findInstalledApps, launchAppRest } from './lib/apps';
 import { artChannelUrl, getArtMode, setArtMode } from './lib/artMode';
 import { SsdpClient } from './lib/discovery/SsdpClient';
 import { SamsungTv as SamsungHJ } from './lib/hj/SamsungTv';
@@ -108,6 +108,8 @@ const POWER_POLL_INTERVAL = 2000;
 const POWER_POLL_DURATION = 30000;
 /** How long switching on waits and repeats Wake-on-LAN, in ms: a TV that is still shutting down misses the packet */
 const WAKE_DURATION = 60000;
+/** How long an app start is repeated while the app API of the TV does not answer yet, in ms */
+const APP_LAUNCH_RETRY = 20000;
 /** Pause between two Wake-on-LAN packets while the TV stays unreachable, in ms */
 const WOL_RETRY_INTERVAL = 10000;
 /** How long KEY_POWER is held to switch The Frame off instead of to Art Mode, in ms */
@@ -2642,14 +2644,22 @@ async function launchAppOf(device: RuntimeDevice, app: string): Promise<void> {
         }
     }
     let restError: unknown;
-    for (const appId of appIds) {
-        try {
-            await launchAppRest(device.ip, appId);
-            markSeen(device);
-            return;
-        } catch (e) {
-            restError = e;
+    // right after waking up the TV reports "on" but its app API answers only some seconds later
+    const until = Date.now() + APP_LAUNCH_RETRY;
+    for (;;) {
+        for (const appId of appIds) {
+            try {
+                await launchAppRest(device.ip, appId);
+                markSeen(device);
+                return;
+            } catch (e) {
+                restError = e;
+            }
         }
+        if (!(restError instanceof TvNotAnsweringError) || Date.now() > until) {
+            break;
+        }
+        await sleep(2000);
     }
     adapter.log.debug(`REST app launch failed on ${device.name} (${errorMessage(restError)}), trying the websocket`);
     await launchApp(device, appIds[0]!);
